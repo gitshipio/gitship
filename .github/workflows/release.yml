@@ -7,7 +7,6 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   build-and-push:
@@ -19,6 +18,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Downcase Repo Name
+        run: |
+          echo "IMAGE_NAME_LOWER=${GITHUB_REPOSITORY@L}" >> "${GITHUB_ENV}"
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -46,7 +49,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/operator:${{ github.ref_name }}
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}/operator:${{ github.ref_name }}
           labels: ${{ steps.meta.outputs.labels }}
 
       # Build and Push Dashboard
@@ -55,7 +58,7 @@ jobs:
         with:
           context: ./web
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/dashboard:${{ github.ref_name }}
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}/dashboard:${{ github.ref_name }}
           labels: ${{ steps.meta.outputs.labels }}
 
       # Generate Install Manifest
@@ -83,7 +86,7 @@ jobs:
           echo "---" >> dist/install.yaml
           
           # Dashboard Deployment with correct image
-          sed "s|image: gitship-dashboard:latest|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/dashboard:${{ github.ref_name }}|g" deploy/dashboard/deployment.yaml >> dist/install.yaml
+          sed "s|image: gitship-dashboard:latest|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}/dashboard:${{ github.ref_name }}|g" deploy/dashboard/deployment.yaml >> dist/install.yaml
           # Ensure PullPolicy is Always for release
           sed -i 's|imagePullPolicy: Never|imagePullPolicy: Always|g' dist/install.yaml
 
