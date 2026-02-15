@@ -42,6 +42,10 @@ jobs:
           images: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/operator
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/dashboard
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.description="GitShip Operator and Dashboard"
+            org.opencontainers.image.licenses=MIT
 
       # Build and Push Operator
       - name: Build and push Operator image
