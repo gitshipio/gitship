@@ -1,0 +1,298 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: gitshipapps.gitship.io
+spec:
+  group: gitship.io
+  names:
+    kind: GitshipApp
+    listKind: GitshipAppList
+    plural: gitshipapps
+    singular: gitshipapp
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: GitshipApp is the Schema for the gitshipapps API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: GitshipAppSpec defines the desired state of GitshipApp.
+            properties:
+              addons:
+                description: Addons (Managed Databases, etc)
+                items:
+                  properties:
+                    name:
+                      description: Name of the addon instance
+                      type: string
+                    plan:
+                      default: small
+                      description: Plan or size (e.g. "small", "medium")
+                      type: string
+                    type:
+                      description: Type of addon (e.g. "postgres", "redis")
+                      type: string
+                  required:
+                  - name
+                  - type
+                  type: object
+                type: array
+              authMethod:
+                default: token
+                description: 'Authentication method: "ssh" or "token"'
+                type: string
+              env:
+                additionalProperties:
+                  type: string
+                type: object
+              healthCheck:
+                properties:
+                  initialDelay:
+                    default: 10
+                    description: Initial delay in seconds before the first probe
+                    format: int32
+                    type: integer
+                  path:
+                    description: HTTP Path for the health check (e.g. "/health")
+                    type: string
+                  port:
+                    description: Port for the health check
+                    format: int32
+                    type: integer
+                  timeout:
+                    default: 5
+                    description: Timeout in seconds for each probe
+                    format: int32
+                    type: integer
+                type: object
+              imageName:
+                type: string
+              ingresses:
+                items:
+                  properties:
+                    host:
+                      description: Domain host (e.g. "myapp.com")
+                      type: string
+                    path:
+                      default: /
+                      description: Path prefix (e.g. "/", "/api")
+                      type: string
+                    servicePort:
+                      description: Which Service port to route to
+                      format: int32
+                      type: integer
+                    tls:
+                      default: false
+                      description: Enable HTTPS for this specific domain
+                      type: boolean
+                  required:
+                  - host
+                  - servicePort
+                  type: object
+                type: array
+              ports:
+                description: Run Configuration
+                items:
+                  properties:
+                    name:
+                      description: Name of the port (e.g. "http", "admin")
+                      type: string
+                    port:
+                      description: External port on the Service
+                      format: int32
+                      type: integer
+                    protocol:
+                      default: TCP
+                      description: 'Protocol: "TCP" or "UDP"'
+                      type: string
+                    targetPort:
+                      description: Internal port on the Container
+                      format: int32
+                      type: integer
+                  required:
+                  - port
+                  - targetPort
+                  type: object
+                type: array
+              registrySecretRef:
+                description: Build Configuration
+                type: string
+              replicas:
+                format: int32
+                type: integer
+              repoUrl:
+                description: Git Configuration
+                type: string
+              resources:
+                properties:
+                  cpu:
+                    default: 500m
+                    description: CPU limit (e.g. "500m", "1")
+                    type: string
+                  memory:
+                    default: 1Gi
+                    description: Memory limit (e.g. "512Mi", "1Gi")
+                    type: string
+                type: object
+              secretMounts:
+                description: List of Secrets to mount as files
+                items:
+                  properties:
+                    mountPath:
+                      description: Path where the secret should be mounted (e.g. "/app/config")
+                      type: string
+                    secretName:
+                      description: Name of the Kubernetes Secret
+                      type: string
+                  required:
+                  - mountPath
+                  - secretName
+                  type: object
+                type: array
+              secretRefs:
+                description: List of Kubernetes Secret names to inject as environment
+                  variables
+                items:
+                  type: string
+                type: array
+              source:
+                default:
+                  type: branch
+                  value: main
+                description: 'Source configuration: branch, tag, or commit'
+                properties:
+                  type:
+                    description: 'Type: "branch", "tag", or "commit"'
+                    type: string
+                  value:
+                    description: 'Value: branch name, tag name, or commit hash'
+                    type: string
+                required:
+                - type
+                - value
+                type: object
+              tls:
+                description: TLS Configuration
+                properties:
+                  issuer:
+                    description: 'Optional: Custom ClusterIssuer name (defaults to
+                      "letsencrypt-prod" if empty)'
+                    type: string
+                type: object
+              updateStrategy:
+                default:
+                  interval: 5m
+                  type: polling
+                description: Update Strategy
+                properties:
+                  interval:
+                    description: Interval for polling (e.g. "5m", "1h"). Ignored if
+                      type is "webhook".
+                    type: string
+                  type:
+                    description: 'Type: "polling" or "webhook"'
+                    type: string
+                required:
+                - type
+                type: object
+              volumes:
+                description: Storage Configuration
+                items:
+                  properties:
+                    mountPath:
+                      type: string
+                    name:
+                      type: string
+                    size:
+                      type: string
+                    storageClass:
+                      type: string
+                  required:
+                  - mountPath
+                  - name
+                  - size
+                  type: object
+                type: array
+            required:
+            - imageName
+            - registrySecretRef
+            - repoUrl
+            type: object
+          status:
+            description: GitshipAppStatus defines the observed state of GitshipApp.
+            properties:
+              appUrl:
+                type: string
+              buildHistory:
+                items:
+                  properties:
+                    commitId:
+                      description: Commit ID of this build
+                      type: string
+                    completionTime:
+                      description: When the build finished
+                      type: string
+                    message:
+                      description: Optional log summary or reference
+                      type: string
+                    startTime:
+                      description: When the build started
+                      type: string
+                    status:
+                      description: 'Status: "Succeeded", "Failed"'
+                      type: string
+                  required:
+                  - commitId
+                  - status
+                  type: object
+                type: array
+              desiredReplicas:
+                format: int32
+                type: integer
+              ingressHost:
+                type: string
+              lastDeployedAt:
+                type: string
+              latestBuildId:
+                type: string
+              phase:
+                type: string
+              readyReplicas:
+                description: Enhanced status fields (Phase 9)
+                format: int32
+                type: integer
+              restartCount:
+                format: int32
+                type: integer
+              serviceType:
+                type: string
+            required:
+            - latestBuildId
+            - phase
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

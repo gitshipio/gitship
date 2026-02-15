@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "gitship.fullname" . }}-controller
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ include "gitship.name" . }}-controller
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "gitship.name" . }}-controller
+  template:
+    metadata:
+      labels:
+        app: {{ include "gitship.name" . }}-controller
+    spec:
+      serviceAccountName: {{ include "gitship.fullname" . }}-controller
+      containers:
+        - name: manager
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /manager
+          env:
+            - name: WATCH_NAMESPACE
+              value: ""
+          resources:
+            limits:
+              cpu: 500m
+              memory: 128Mi
+            requests:
+              cpu: 10m
+              memory: 64Mi
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "gitship.fullname" . }}-controller
+  namespace: {{ .Release.Namespace }}

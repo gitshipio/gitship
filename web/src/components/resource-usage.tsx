@@ -1,0 +1,156 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Cpu, MemoryStick, Box, Loader2, Zap } from "lucide-react"
+import { cn } from "@/lib/utils"
+
+interface QuotaData {
+    hard: Record<string, string>
+    used: Record<string, string>
+}
+
+function parseResourceValue(val: string): number {
+    if (!val) return 0
+    const s = val.toString().toLowerCase()
+    if (s.endsWith("m")) return parseFloat(s)
+    if (s.endsWith("gi")) return parseFloat(s) * 1024 * 1024 * 1024
+    if (s.endsWith("mi")) return parseFloat(s) * 1024 * 1024
+    if (s.endsWith("ki")) return parseFloat(s) * 1024
+    return parseFloat(s)
+}
+
+function UsageDetail({ label, used, hard, unit, icon: Icon, color, isCpu }: any) {
+    let usedNum = parseResourceValue(used)
+    let hardNum = parseResourceValue(hard)
+    
+    if (isCpu) {
+        if (!used.toString().endsWith("m")) usedNum *= 1000
+        if (!hard.toString().endsWith("m")) hardNum *= 1000
+    }
+    
+    const percent = hardNum > 0 ? Math.min((usedNum / hardNum) * 100, 100) : 0
+    
+    const remaining = Math.max(0, hardNum - usedNum)
+    
+    const format = (v: number) => {
+        if (isCpu) return v.toFixed(0) + "m"
+        if (v >= 1024 * 1024 * 1024) return (v / (1024 * 1024 * 1024)).toFixed(1) + "Gi"
+        if (v >= 1024 * 1024) return (v / (1024 * 1024)).toFixed(0) + "Mi"
+        if (label === "Active Pods") return v.toFixed(0)
+        return v.toFixed(0) + (unit || "")
+    }
+
+    return (
+        <div className="space-y-3">
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                    <div className={cn("p-2 rounded-lg bg-background border shadow-sm", color)}>
+                        <Icon className="w-4 h-4" />
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-black uppercase tracking-tighter opacity-40 leading-none mb-1">{label}</p>
+                        <p className="text-sm font-bold leading-none truncate max-w-[80px]" title={used}>{format(usedNum)} used</p>
+                    </div>
+                </div>
+                <div className="text-right">
+                    <p className="text-[10px] font-black uppercase tracking-tighter opacity-40 leading-none mb-1">Limit</p>
+                    <p className="text-sm font-bold leading-none truncate max-w-[60px]" title={hard}>{format(hardNum)}</p>
+                </div>
+            </div>
+            
+            <div className="space-y-1.5">
+                <div className="h-2.5 bg-muted rounded-full overflow-hidden border p-0.5">
+                    <div 
+                        className={cn("h-full rounded-full transition-all duration-1000", 
+                            percent > 90 ? "bg-destructive" : percent > 75 ? "bg-amber-500" : color.replace("text-", "bg-")
+                        )}
+                        style={{ width: `${percent}%` }}
+                    />
+                </div>
+                <div className="flex justify-between items-center px-0.5">
+                    <span className="text-[9px] font-bold opacity-50">{percent.toFixed(0)}% consumed</span>
+                    <span className={cn("text-[9px] font-bold", remaining === 0 ? "text-destructive" : "text-emerald-500")}>
+                        {remaining > 0 ? `${format(remaining)} available` : "Quota reached"}
+                    </span>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+export function ResourceUsage({ data: initialData }: { data?: QuotaData }) {
+    const [data, setData] = useState<QuotaData | null>(initialData || null)
+    const [loading, setLoading] = useState(!initialData)
+
+    useEffect(() => {
+        const fetchQuotas = async () => {
+            try {
+                const res = await fetch("/api/user/quotas")
+                if (res.ok) {
+                    const json = await res.json()
+                    setData(json)
+                }
+            } catch (e) {
+                console.error("Failed to fetch quotas:", e)
+            } finally {
+                setLoading(false)
+            }
+        }
+        
+        fetchQuotas()
+        const interval = setInterval(fetchQuotas, 15000)
+        return () => clearInterval(interval)
+    }, [])
+
+    if (loading && !data) return (
+        <div className="flex items-center gap-3 p-4 border-2 border-dashed rounded-2xl bg-muted/5 animate-pulse">
+            <Loader2 className="w-4 h-4 animate-spin text-primary" />
+            <span className="text-xs font-bold uppercase tracking-widest opacity-50">Syncing Quota...</span>
+        </div>
+    )
+
+    if (!data) return null
+
+    return (
+        <Card className="border-2 shadow-xl bg-card/50 backdrop-blur-md overflow-hidden">
+            <CardHeader className="py-4 border-b bg-muted/10">
+                <div className="flex items-center justify-between">
+                    <CardTitle className="text-[11px] font-black uppercase tracking-[0.2em] opacity-60 flex items-center gap-2">
+                        <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                        My Plan Usage
+                    </CardTitle>
+                    <Badge variant="outline" className="text-[9px] h-4 font-bold border-primary/20 bg-primary/5 text-primary">Live</Badge>
+                </div>
+            </CardHeader>
+            <CardContent className="pt-6 space-y-8">
+                <UsageDetail 
+                    label="CPU Compute" 
+                    used={data.used["requests.cpu"] || data.used["cpu"]} 
+                    hard={data.hard["requests.cpu"] || data.hard["cpu"]} 
+                    unit="m" 
+                    icon={Cpu} 
+                    color="text-blue-500" 
+                    isCpu={true}
+                />
+                <UsageDetail 
+                    label="RAM Memory" 
+                    used={data.used["requests.memory"] || data.used["memory"]} 
+                    hard={data.hard["requests.memory"] || data.hard["memory"]} 
+                    unit="" 
+                    icon={MemoryStick} 
+                    color="text-purple-500" 
+                />
+                <UsageDetail 
+                    label="Active Pods" 
+                    used={data.used["pods"]} 
+                    hard={data.hard["pods"]} 
+                    unit="" 
+                    icon={Box} 
+                    color="text-emerald-500" 
+                />
+            </CardContent>
+        </Card>
+    )
+}

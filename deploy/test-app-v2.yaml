@@ -1,0 +1,10 @@
+apiVersion: gitship.io/v1alpha1
+kind: GitshipApp
+metadata:
+  name: gitship-test-v2
+  namespace: gitship-user-demo
+spec:
+  repoUrl: "https://github.com/gitshipio/gitship-repo-test.git"
+  imageName: "gitshipio/gitship-test-v2" # Simple name with slash (user/repo style)
+  port: 3000
+  # No RegistrySecretRef -> Should trigger Insecure Mode & Auto-URL Logic

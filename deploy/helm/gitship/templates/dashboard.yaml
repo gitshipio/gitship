@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "gitship.fullname" . }}-dashboard
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ include "gitship.name" . }}-dashboard
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ include "gitship.name" . }}-dashboard
+  template:
+    metadata:
+      labels:
+        app: {{ include "gitship.name" . }}-dashboard
+    spec:
+      serviceAccountName: {{ include "gitship.fullname" . }}-dashboard
+      containers:
+        - name: dashboard
+          image: "{{ .Values.dashboard.image.repository }}:{{ .Values.dashboard.image.tag | default .Chart.AppVersion }}"
+          ports:
+            - containerPort: 3000
+          env:
+            - name: AUTH_SECRET
+              value: {{ .Values.auth.secret | quote }}
+            - name: AUTH_GITHUB_ID
+              value: {{ .Values.github.clientId | quote }}
+            - name: AUTH_GITHUB_SECRET
+              value: {{ .Values.github.clientSecret | quote }}
+            - name: NEXT_PUBLIC_GITHUB_APP_NAME
+              value: {{ .Values.github.appName | quote }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "gitship.fullname" . }}-dashboard
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: {{ .Values.dashboard.service.type }}
+  ports:
+    - port: {{ .Values.dashboard.service.port }}
+      targetPort: 3000
+  selector:
+    app: {{ include "gitship.name" . }}-dashboard
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "gitship.fullname" . }}-dashboard
+  namespace: {{ .Release.Namespace }}

@@ -1,0 +1,110 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: gitshipusers.gitship.io
+spec:
+  group: gitship.io
+  names:
+    kind: GitshipUser
+    listKind: GitshipUserList
+    plural: gitshipusers
+    singular: gitshipuser
+  scope: Cluster
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: GitshipUser is the Schema for the gitshipusers API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: GitshipUserSpec defines the desired state of GitshipUser.
+            properties:
+              customSpaces:
+                description: List of custom namespace suffixes (e.g. "staging" ->
+                  "gitship-user-simon-staging")
+                items:
+                  type: string
+                type: array
+              githubID:
+                format: int64
+                type: integer
+              githubUsername:
+                type: string
+              quotas:
+                description: Resource Quotas for this user's namespaces
+                properties:
+                  cpu:
+                    description: Maximum CPU cores (e.g. "4")
+                    type: string
+                  memory:
+                    description: Maximum Memory (e.g. "8Gi")
+                    type: string
+                  pods:
+                    description: Maximum number of Pods
+                    type: string
+                type: object
+              registries:
+                description: Saved registries for this user
+                items:
+                  properties:
+                    name:
+                      type: string
+                    password:
+                      type: string
+                    server:
+                      type: string
+                    username:
+                      type: string
+                  required:
+                  - name
+                  - password
+                  - server
+                  - username
+                  type: object
+                type: array
+              role:
+                default: restricted
+                description: 'User role: admin, user, restricted'
+                type: string
+            required:
+            - githubID
+            - githubUsername
+            type: object
+          status:
+            description: GitshipUserStatus defines the observed state of GitshipUser.
+            properties:
+              namespaces:
+                description: List of actually created namespaces
+                items:
+                  type: string
+                type: array
+              ready:
+                type: boolean
+            required:
+            - ready
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

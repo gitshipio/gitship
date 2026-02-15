@@ -1,0 +1,10 @@
+apiVersion: gitship.io.gitship.io/v1alpha1
+kind: GitshipUser
+metadata:
+  labels:
+    app.kubernetes.io/name: gitship
+    app.kubernetes.io/managed-by: kustomize
+  name: gitshipuser-sample
+spec:
+  githubUsername: "sampleuser"
+  githubID: 12345

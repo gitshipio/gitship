@@ -1,0 +1,7 @@
+## Append samples of your project ##
+resources:
+- ci_v1alpha1_repowatcher.yaml
+- gitship.io_v1alpha1_user.yaml
+- gitship.io_v1alpha1_gitshipuser.yaml
+- gitship.io_v1alpha1_gitshipapp.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples

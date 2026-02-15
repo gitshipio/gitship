@@ -1,0 +1,38 @@
+# Default values for gitship.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  repository: gitshipio/gitship-controller
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "latest"
+
+dashboard:
+  image:
+    repository: gitshipio/gitship-dashboard
+    tag: "latest"
+  service:
+    type: ClusterIP
+    port: 3000
+  ingress:
+    enabled: false
+    className: "nginx"
+    hosts:
+      - host: gitship.local
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+
+registry:
+  enabled: true # Whether to deploy the internal registry
+
+github:
+  clientId: ""
+  clientSecret: ""
+  appName: ""
+
+auth:
+  secret: "change-me-to-a-random-string"

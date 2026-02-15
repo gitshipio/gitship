@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gitship-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitship-registry
+  namespace: gitship-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gitship-registry
+  template:
+    metadata:
+      labels:
+        app: gitship-registry
+    spec:
+      containers:
+      - name: registry
+        image: registry:2
+        ports:
+        - containerPort: 5000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitship-registry
+  namespace: gitship-system
+spec:
+  type: NodePort
+  ports:
+  - port: 5000
+    targetPort: 5000
+    nodePort: 30005
+  selector:
+    app: gitship-registry

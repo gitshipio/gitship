@@ -1,0 +1,12 @@
+apiVersion: gitship.io/v1alpha1
+kind: GitshipApp
+metadata:
+  labels:
+    app.kubernetes.io/name: gitship
+    app.kubernetes.io/managed-by: kustomize
+  name: gitshipapp-sample
+spec:
+  imageName: "nginx:latest"
+  port: 80
+  registrySecretRef: "regcred"
+  repoUrl: "https://github.com/example/repo"
