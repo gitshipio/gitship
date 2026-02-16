@@ -76,7 +76,7 @@ jobs:
           
           # Update Controller Image
           cd config/manager
-          kustomize edit set image controller=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/operator:${{ github.ref_name }}
+          kustomize edit set image controller=${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}/operator:${{ github.ref_name }}
           cd ../..
           
           # Build Base Manifest
