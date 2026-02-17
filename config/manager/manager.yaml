@@ -5,13 +5,12 @@ metadata:
     control-plane: controller-manager
     app.kubernetes.io/name: gitship
     app.kubernetes.io/managed-by: kustomize
-  name: system
+  name: gitship-system
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: controller-manager
-  namespace: system
   labels:
     control-plane: controller-manager
     app.kubernetes.io/name: gitship
@@ -44,7 +43,11 @@ spec:
           - --leader-elect
           - --health-probe-bind-address=:8081
         image: controller:latest
+        imagePullPolicy: IfNotPresent
         name: manager
+        envFrom:
+          - configMapRef:
+              name: controller-config
         ports: []
         securityContext:
           allowPrivilegeEscalation: false

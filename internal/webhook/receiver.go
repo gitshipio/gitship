@@ -40,7 +40,9 @@ func (r *Receiver) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "Failed to read body", http.StatusBadRequest)
 		return
 	}
-	defer req.Body.Close()
+	defer func() {
+		_ = req.Body.Close()
+	}()
 
 	// Verify Signature (Global Secret from Env)
 	secret := os.Getenv("GITHUB_WEBHOOK_SECRET")
@@ -81,7 +83,8 @@ func (r *Receiver) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		source := app.Spec.Source
 		isMatch := false
 
-		if source.Type == "branch" {
+		switch source.Type {
+		case "branch":
 			targetBranch := source.Value
 			if targetBranch == "" || targetBranch == "HEAD" {
 				targetBranch = "main" // Simplified fallback
@@ -89,7 +92,7 @@ func (r *Receiver) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			if targetBranch == branch {
 				isMatch = true
 			}
-		} else if source.Type == "tag" {
+		case "tag":
 			if strings.HasPrefix(rawRef, "refs/tags/") {
 				tag := strings.TrimPrefix(rawRef, "refs/tags/")
 				if tag == source.Value {
@@ -130,10 +133,10 @@ func (r *Receiver) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	if triggeredCount > 0 {
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, "Triggered %d GitshipApps", triggeredCount)
+		_, _ = fmt.Fprintf(w, "Triggered %d GitshipApps", triggeredCount)
 	} else {
 		w.WriteHeader(http.StatusOK) // 200 OK even if no match, to satisfy GitHub
-		fmt.Fprint(w, "No matching GitshipApps found")
+		_, _ = fmt.Fprint(w, "No matching GitshipApps found")
 	}
 }
 

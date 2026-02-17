@@ -51,6 +51,10 @@ var _ = Describe("GitshipUser Controller", func() {
 						Name:      resourceName,
 						Namespace: "default",
 					},
+					Spec: gitshipiov1alpha1.GitshipUserSpec{
+						GitHubUsername: "test-user",
+						GitHubID:       12345,
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}
@@ -69,6 +73,9 @@ var _ = Describe("GitshipUser Controller", func() {
 			controllerReconciler := &GitshipUserReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
+				Config: ControllerConfig{
+					SystemNamespace: "gitship-system",
+				},
 			}
 
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{

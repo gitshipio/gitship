@@ -40,12 +40,15 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y openssl openssh-client ca-certificates && rm -rf /var/lib/apt/lists/*
 
+# Install runtime dependencies for WebSocket handler
+RUN npm install ws @kubernetes/client-node --omit=dev --no-save
+
 ENV NODE_ENV=production
 # Uncomment the following line in case you want to disable telemetry during runtime.
 ENV NEXT_TELEMETRY_DISABLED=1
 
 ENV PORT=3000
-# set hostname to localhost
+# set hostname to 0.0.0.0 for container access
 ENV HOSTNAME="0.0.0.0"
 
 # Use existing node user
@@ -57,8 +60,12 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=node:node /app/.next/standalone ./
 COPY --from=builder --chown=node:node /app/.next/static ./.next/static
 
+# Copy WebSocket server and its handler
+COPY --from=builder --chown=node:node /app/ws-server.js ./ws-server.js
+
 USER node
 
 EXPOSE 3000
 
-CMD ["node", "server.js"]
+# Start both Next.js and WebSocket server
+CMD ["sh", "-c", "node ws-server.js & node server.js"]

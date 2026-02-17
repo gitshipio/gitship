@@ -44,8 +44,8 @@ type RepoWatcherStatus struct {
 	// Important: Run "make" to regenerate code after modifying this file
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
 
 // RepoWatcher is the Schema for the repowatchers API
 type RepoWatcher struct {
@@ -56,7 +56,7 @@ type RepoWatcher struct {
 	Status RepoWatcherStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // RepoWatcherList contains a list of RepoWatcher
 type RepoWatcherList struct {

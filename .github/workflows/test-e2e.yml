@@ -26,6 +26,12 @@ jobs:
       - name: Verify kind installation
         run: kind version
 
+      - name: Create kind cluster
+        run: kind create cluster --name gitship-test-e2e --wait 120s
+
+      - name: Check kubectl context
+        run: kubectl cluster-info
+
       - name: Running Test e2e
         run: |
           go mod tidy

@@ -74,23 +74,16 @@ jobs:
           curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
           mv kustomize /usr/local/bin/
           
-          # Update Controller Image
+          # Update Images in Kustomize
           cd config/manager
           kustomize edit set image controller=${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}/operator:${{ github.ref_name }}
+          cd ../dashboard
+          kustomize edit set image gitship-dashboard=${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}/dashboard:${{ github.ref_name }}
           cd ../..
           
-          # Build Base Manifest
+          # Build consolidated manifest (includes Controller, Dashboard, Registry, RBAC, etc.)
           kustomize build config/default > dist/install.yaml
           
-          # Append Dashboard Manifests
-          echo "---" >> dist/install.yaml
-          cat deploy/dashboard/rbac.yaml >> dist/install.yaml
-          echo "---" >> dist/install.yaml
-          cat deploy/dashboard/service.yaml >> dist/install.yaml
-          echo "---" >> dist/install.yaml
-          
-          # Dashboard Deployment with correct image
-          sed "s|image: gitship-dashboard:latest|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}/dashboard:${{ github.ref_name }}|g" deploy/dashboard/deployment.yaml >> dist/install.yaml
           # Ensure PullPolicy is Always for release
           sed -i 's|imagePullPolicy: Never|imagePullPolicy: Always|g' dist/install.yaml
 

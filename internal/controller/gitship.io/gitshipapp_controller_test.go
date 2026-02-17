@@ -69,6 +69,9 @@ var _ = Describe("GitshipApp Controller", func() {
 			controllerReconciler := &GitshipAppReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
+				Config: ControllerConfig{
+					SystemNamespace: "gitship-system",
+				},
 			}
 
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
