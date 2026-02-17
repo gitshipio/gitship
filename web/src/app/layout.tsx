@@ -41,9 +41,9 @@ export default function RootLayout({
           <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <div className="container flex h-14 items-center px-4 md:px-8 max-w-screen-2xl mx-auto">
               <div className="mr-4 flex">
-                <Link href="/" className="mr-6 flex items-center space-x-2">
-                  <span className="font-bold inline-block">
-                    <span className="bg-primary text-primary-foreground px-1.5 py-0.5 rounded mr-1.5 text-sm tracking-tight">G</span>
+                <Link href="/" className="mr-6 flex items-center space-x-2.5">
+                  <img src="/logo.svg" alt="Gitship Logo" className="h-7 w-7" />
+                  <span className="font-bold inline-block text-lg">
                     Gitship
                   </span>
                 </Link>
