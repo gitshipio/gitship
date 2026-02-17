@@ -17,7 +17,8 @@ import {
     Loader2, 
     Settings2, 
     Activity,
-    ExternalLink
+    ExternalLink,
+    Save
 } from "lucide-react"
 import Link from "next/link"
 import { GitshipUser, GitshipApp } from "@/lib/types"
@@ -38,6 +39,7 @@ export function UserAdminDetailUI({ user, apps, quotas }: UserAdminDetailProps) 
     const [cpu, setCpu] = useState(user.spec.quotas?.cpu || "4")
     const [memory, setMemory] = useState(user.spec.quotas?.memory || "8Gi")
     const [pods, setPods] = useState(user.spec.quotas?.pods || "20")
+    const [storage, setStorage] = useState(user.spec.quotas?.storage || "10Gi")
 
     const handleSave = async () => {
         setLoading(true)
@@ -51,7 +53,7 @@ export function UserAdminDetailUI({ user, apps, quotas }: UserAdminDetailProps) 
             await fetch(`/api/admin/users/${user.metadata.name}/quotas`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ quotas: { cpu, memory, pods } }),
+                body: JSON.stringify({ quotas: { cpu, memory, pods, storage } }),
             })
 
             router.refresh()
@@ -107,7 +109,7 @@ export function UserAdminDetailUI({ user, apps, quotas }: UserAdminDetailProps) 
                             <CardTitle className="text-sm font-bold uppercase tracking-wider opacity-70">Live Consumption</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <ResourceUsage data={quotas} />
+                            <ResourceUsage data={quotas} username={user.metadata.name} />
                         </CardContent>
                     </Card>
 
@@ -136,24 +138,88 @@ export function UserAdminDetailUI({ user, apps, quotas }: UserAdminDetailProps) 
                     </Card>
 
                     {/* Quotas Card */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-sm font-bold uppercase tracking-wider opacity-70 flex items-center gap-2">
-                                <Settings2 className="w-4 h-4" /> Configure Quotas
+                    <Card className="overflow-hidden border-2">
+                        <CardHeader className="bg-muted/50 border-b">
+                            <CardTitle className="text-sm font-bold uppercase tracking-wider flex items-center gap-2">
+                                <Settings2 className="w-4 h-4 text-primary" /> 
+                                Quota Configuration
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="space-y-2">
-                                <Label className="text-[10px] uppercase font-bold opacity-70">CPU Limit</Label>
-                                <Input value={cpu} onChange={e => setCpu(e.target.value)} className="font-mono h-11 border-2" />
+                        <CardContent className="space-y-6 pt-6">
+                            {/* Presets */}
+                            <div className="space-y-3">
+                                <Label className="text-[10px] uppercase font-black opacity-50 tracking-widest">Quick Presets</Label>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {[
+                                        { label: "Starter", cpu: "1", mem: "2Gi", pods: "10", storage: "5Gi" },
+                                        { label: "Dev", cpu: "4", mem: "8Gi", pods: "20", storage: "20Gi" },
+                                        { label: "Power", cpu: "16", mem: "32Gi", pods: "50", storage: "100Gi" },
+                                    ].map((p) => (
+                                        <Button 
+                                            key={p.label} 
+                                            variant="outline" 
+                                            size="sm" 
+                                            className="h-8 text-[10px] font-bold uppercase tracking-tighter hover:bg-primary hover:text-primary-foreground transition-all"
+                                            onClick={() => {
+                                                setCpu(p.cpu)
+                                                setMemory(p.mem)
+                                                setPods(p.pods)
+                                                setStorage(p.storage)
+                                            }}
+                                        >
+                                            {p.label}
+                                        </Button>
+                                    ))}
+                                </div>
                             </div>
-                            <div className="space-y-2">
-                                <Label className="text-[10px] uppercase font-bold opacity-70">Memory Limit</Label>
-                                <Input value={memory} onChange={e => setMemory(e.target.value)} className="font-mono h-11 border-2" />
+
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <div className="flex justify-between items-center">
+                                        <Label className="text-[10px] uppercase font-black opacity-70 flex items-center gap-1.5">
+                                            <Cpu className="w-3.5 h-3.5" /> CPU Cores
+                                        </Label>
+                                        <span className="text-[10px] font-mono opacity-40">e.g. 0.5, 4, 16</span>
+                                    </div>
+                                    <Input value={cpu} onChange={e => setCpu(e.target.value)} className="font-mono h-10 border-2 focus-visible:ring-primary/20" />
+                                </div>
+                                
+                                <div className="space-y-2">
+                                    <div className="flex justify-between items-center">
+                                        <Label className="text-[10px] uppercase font-black opacity-70 flex items-center gap-1.5">
+                                            <Database className="w-3.5 h-3.5" /> RAM Memory
+                                        </Label>
+                                        <span className="text-[10px] font-mono opacity-40">e.g. 512Mi, 8Gi</span>
+                                    </div>
+                                    <Input value={memory} onChange={e => setMemory(e.target.value)} className="font-mono h-10 border-2 focus-visible:ring-primary/20" />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <div className="flex justify-between items-center">
+                                        <Label className="text-[10px] uppercase font-black opacity-70 flex items-center gap-1.5">
+                                            <Layout className="w-3.5 h-3.5" /> Max Pods
+                                        </Label>
+                                        <span className="text-[10px] font-mono opacity-40">Total instances</span>
+                                    </div>
+                                    <Input value={pods} onChange={e => setPods(e.target.value)} className="font-mono h-10 border-2 focus-visible:ring-primary/20" />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <div className="flex justify-between items-center">
+                                        <Label className="text-[10px] uppercase font-black opacity-70 flex items-center gap-1.5">
+                                            <Database className="w-3.5 h-3.5" /> Disk Storage
+                                        </Label>
+                                        <span className="text-[10px] font-mono opacity-40">e.g. 5Gi, 20Gi</span>
+                                    </div>
+                                    <Input value={storage} onChange={e => setStorage(e.target.value)} className="font-mono h-10 border-2 focus-visible:ring-primary/20" />
+                                </div>
                             </div>
-                            <div className="space-y-2">
-                                <Label className="text-[10px] uppercase font-bold opacity-70">Pod Limit</Label>
-                                <Input value={pods} onChange={e => setPods(e.target.value)} className="font-mono h-11 border-2" />
+
+                            <div className="pt-2">
+                                <Button onClick={handleSave} disabled={loading} className="w-full shadow-lg shadow-primary/10">
+                                    {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                                    Apply Quota Limits
+                                </Button>
                             </div>
                         </CardContent>
                     </Card>

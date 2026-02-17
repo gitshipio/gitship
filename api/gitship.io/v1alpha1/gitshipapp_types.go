@@ -39,12 +39,12 @@ type GitshipAppSpec struct {
 	ImageName         string `json:"imageName"`         // e.g. "ghcr.io/user/image"
 
 	// Run Configuration
-	Ports    []PortConfig      `json:"ports,omitempty"` // Multiple port mappings
-	Env      map[string]string `json:"env,omitempty"`
-	Resources ResourceConfig   `json:"resources,omitempty"` // Resource requests/limits
-	Replicas int32             `json:"replicas,omitempty"`
-	Ingresses []IngressRuleConfig `json:"ingresses,omitempty"` // Multiple domains/paths
-	HealthCheck HealthCheckConfig `json:"healthCheck,omitempty"`
+	Ports       []PortConfig        `json:"ports,omitempty"` // Multiple port mappings
+	Env         map[string]string   `json:"env,omitempty"`
+	Resources   ResourceConfig      `json:"resources,omitempty"` // Resource requests/limits
+	Replicas    int32               `json:"replicas,omitempty"`
+	Ingresses   []IngressRuleConfig `json:"ingresses,omitempty"` // Multiple domains/paths
+	HealthCheck HealthCheckConfig   `json:"healthCheck,omitempty"`
 
 	// Storage Configuration
 	Volumes []VolumeConfig `json:"volumes,omitempty"`
@@ -71,9 +71,9 @@ type AddonConfig struct {
 	Type string `json:"type"`
 	// Name of the addon instance
 	Name string `json:"name"`
-	// Plan or size (e.g. "small", "medium")
+	// Size of the addon instance (e.g. "small", "medium")
 	// +kubebuilder:default:="small"
-	Plan string `json:"plan,omitempty"`
+	Size string `json:"size,omitempty"`
 }
 
 type SecretMountConfig struct {
@@ -128,6 +128,9 @@ type ResourceConfig struct {
 	// Memory limit (e.g. "512Mi", "1Gi")
 	// +kubebuilder:default:="1Gi"
 	Memory string `json:"memory,omitempty"`
+	// Storage limit (e.g. "1Gi", "10Gi")
+	// +kubebuilder:default:="1Gi"
+	Storage string `json:"storage,omitempty"`
 }
 
 type SourceConfig struct {
@@ -182,7 +185,7 @@ type GitshipAppStatus struct {
 	DesiredReplicas int32  `json:"desiredReplicas,omitempty"`
 	RestartCount    int32  `json:"restartCount,omitempty"`
 	LastDeployedAt  string `json:"lastDeployedAt,omitempty"`
-	ServiceType     string `json:"serviceType,omitempty"`  // "ClusterIP", "NodePort", "LoadBalancer"
+	ServiceType     string `json:"serviceType,omitempty"` // "ClusterIP", "NodePort", "LoadBalancer"
 	IngressHost     string `json:"ingressHost,omitempty"`
 }
 

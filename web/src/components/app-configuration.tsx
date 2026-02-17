@@ -32,7 +32,7 @@ interface AppConfigurationProps {
         tls?: { enabled: boolean; issuer?: string }
         secretRefs?: string[]
         secretMounts?: { secretName: string; mountPath: string }[]
-        addons?: { type: string; name: string; plan?: string }[]
+        addons?: { type: string; name: string; size?: string }[]
     }
 }
 
@@ -74,14 +74,14 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
     
     const [volumes, setVolumes] = useState(spec?.volumes || [])
     const [secretMounts, setSecretMounts] = useState<{ secretName: string; mountPath: string }[]>(spec?.secretMounts || [])
-    const [addons, setAddons] = useState<{ type: string; name: string; plan?: string }[]>(spec?.addons || [])
+    const [addons, setAddons] = useState<{ type: string; name: string; size?: string }[]>(spec?.addons || [])
     
     const [isPending, startTransition] = useTransition()
     const [message, setMessage] = useState("")
 
     const addAddon = (type: string) => {
         const id = Math.random().toString(36).substring(7)
-        setAddons([...addons, { type, name: `${type}-${id}`, plan: "small" }])
+        setAddons([...addons, { type, name: `${type}-${id}`, size: "small" }])
     }
     const removeAddon = (idx: number) => setAddons(addons.filter((_, i) => i !== idx))
 
@@ -739,7 +739,7 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
                                             <p className="text-sm font-bold">{a.name}</p>
                                             <div className="flex gap-2 mt-1">
                                                 <Badge variant="outline" className="text-[9px] h-4">{a.type}</Badge>
-                                                <Badge variant="secondary" className="text-[9px] h-4">Plan: {a.plan}</Badge>
+                                                <Badge variant="secondary" className="text-[9px] h-4">Size: {a.size}</Badge>
                                             </div>
                                         </div>
                                     </div>

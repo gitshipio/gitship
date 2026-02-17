@@ -48,6 +48,8 @@ type UserQuotas struct {
 	Memory string `json:"memory,omitempty"`
 	// Maximum number of Pods
 	Pods string `json:"pods,omitempty"`
+	// Maximum Storage (e.g. "10Gi")
+	Storage string `json:"storage,omitempty"`
 }
 
 type RegistryConfig struct {

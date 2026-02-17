@@ -24,6 +24,7 @@ export interface GitshipUser {
       cpu?: string;
       memory?: string;
       pods?: string;
+      storage?: string;
     };
   };
   status?: {
@@ -93,7 +94,7 @@ export interface SecretMountConfig {
 export interface AddonConfig {
     type: string;
     name: string;
-    plan?: string;
+    size?: string;
 }
 
 export interface VolumeConfig {

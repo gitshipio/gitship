@@ -32,6 +32,8 @@ export function RegistrySettings({ registries = [] }: { registries?: RegistryCon
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
     const [open, setOpen] = useState(false)
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+    const [registryToDelete, setRegistryToDelete] = useState<string | null>(null)
     const router = useRouter()
 
     const handleAdd = async (e: React.FormEvent) => {
@@ -64,21 +66,25 @@ export function RegistrySettings({ registries = [] }: { registries?: RegistryCon
         }
     }
 
-    const handleDelete = async (regName: string) => {
-        if (!confirm(`Permanently delete registry "${regName}"?`)) return
-
+    const handleDelete = async () => {
+        if (!registryToDelete) return
+        setLoading(true)
         try {
             const res = await fetch("/api/user/registries", {
                 method: "DELETE",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name: regName }),
+                body: JSON.stringify({ name: registryToDelete }),
             })
 
             if (res.ok) {
+                setDeleteConfirmOpen(false)
+                setRegistryToDelete(null)
                 router.refresh()
             }
         } catch (e: any) {
             alert(e.message)
+        } finally {
+            setLoading(false)
         }
     }
 
@@ -216,7 +222,10 @@ export function RegistrySettings({ registries = [] }: { registries?: RegistryCon
                                     variant="ghost"
                                     size="icon"
                                     className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                                    onClick={() => handleDelete(reg.name)}
+                                    onClick={() => {
+                                        setRegistryToDelete(reg.name)
+                                        setDeleteConfirmOpen(true)
+                                    }}
                                 >
                                     <Trash2 className="w-4 h-4" />
                                 </Button>
@@ -224,6 +233,26 @@ export function RegistrySettings({ registries = [] }: { registries?: RegistryCon
                         ))}
                     </div>
                 )}
+
+                <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Remove Registry</DialogTitle>
+                            <DialogDescription>
+                                Are you sure you want to remove <strong>{registryToDelete}</strong>? 
+                                This will delete the associated Kubernetes Secret. Applications using this registry for pulling images might fail if not updated.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)} disabled={loading}>
+                                Cancel
+                            </Button>
+                            <Button variant="destructive" onClick={handleDelete} disabled={loading}>
+                                {loading ? "Deleting..." : "Confirm Removal"}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </CardContent>
         </Card>
     )

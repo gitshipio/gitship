@@ -43,6 +43,7 @@ export function UserManagementSheet({ user }: UserManagementSheetProps) {
     const [cpu, setCpu] = useState(user.spec.quotas?.cpu || "4")
     const [memory, setMemory] = useState(user.spec.quotas?.memory || "8Gi")
     const [pods, setPods] = useState(user.spec.quotas?.pods || "20")
+    const [storage, setStorage] = useState(user.spec.quotas?.storage || "10Gi")
 
     const handleSave = async () => {
         setLoading(true)
@@ -58,7 +59,7 @@ export function UserManagementSheet({ user }: UserManagementSheetProps) {
             const quotaRes = await fetch(`/api/admin/users/${user.metadata.name}/quotas`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ quotas: { cpu, memory, pods } }),
+                body: JSON.stringify({ quotas: { cpu, memory, pods, storage } }),
             })
 
             if (roleRes.ok && quotaRes.ok) {
@@ -137,27 +138,60 @@ export function UserManagementSheet({ user }: UserManagementSheetProps) {
 
                     {/* Quotas Section */}
                     <div className="space-y-4">
-                        <h4 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                            <Settings2 className="w-4 h-4" /> Resource Quotas
-                        </h4>
+                        <div className="flex items-center justify-between">
+                            <h4 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                                <Settings2 className="w-4 h-4" /> Resource Quotas
+                            </h4>
+                        </div>
+                        
+                        {/* Presets */}
+                        <div className="grid grid-cols-3 gap-2">
+                            {[
+                                { label: "Starter", cpu: "1", mem: "2Gi", pods: "10", storage: "5Gi" },
+                                { label: "Dev", cpu: "4", mem: "8Gi", pods: "20", storage: "20Gi" },
+                                { label: "Power", cpu: "16", mem: "32Gi", pods: "50", storage: "100Gi" },
+                            ].map((p) => (
+                                <Button 
+                                    key={p.label} 
+                                    variant="secondary" 
+                                    size="sm" 
+                                    className="h-7 text-[9px] font-black uppercase tracking-tighter"
+                                    onClick={() => {
+                                        setCpu(p.cpu)
+                                        setMemory(p.mem)
+                                        setPods(p.pods)
+                                        setStorage(p.storage)
+                                    }}
+                                >
+                                    {p.label}
+                                </Button>
+                            ))}
+                        </div>
+
                         <div className="space-y-4 p-4 rounded-xl border bg-muted/5">
                             <div className="space-y-2">
                                 <Label className="text-[10px] uppercase font-bold opacity-70 flex items-center gap-1.5">
                                     <Cpu className="w-3 h-3" /> CPU Limit
                                 </Label>
-                                <Input value={cpu} onChange={e => setCpu(e.target.value)} className="font-mono" />
+                                <Input value={cpu} onChange={e => setCpu(e.target.value)} className="font-mono h-9" />
                             </div>
                             <div className="space-y-2">
                                 <Label className="text-[10px] uppercase font-bold opacity-70 flex items-center gap-1.5">
                                     <Database className="w-3 h-3" /> RAM Limit
                                 </Label>
-                                <Input value={memory} onChange={e => setMemory(e.target.value)} className="font-mono" />
+                                <Input value={memory} onChange={e => setMemory(e.target.value)} className="font-mono h-9" />
                             </div>
                             <div className="space-y-2">
                                 <Label className="text-[10px] uppercase font-bold opacity-70 flex items-center gap-1.5">
                                     <Layout className="w-3 h-3" /> Max Pods
                                 </Label>
-                                <Input value={pods} onChange={e => setPods(e.target.value)} className="font-mono" />
+                                <Input value={pods} onChange={e => setPods(e.target.value)} className="font-mono h-9" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-[10px] uppercase font-bold opacity-70 flex items-center gap-1.5">
+                                    <Database className="w-3 h-3" /> Disk Storage
+                                </Label>
+                                <Input value={storage} onChange={e => setStorage(e.target.value)} className="font-mono h-9" />
                             </div>
                         </div>
                     </div>

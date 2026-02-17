@@ -32,6 +32,10 @@ export function AppSecrets({ appName, namespace, secretRefs }: AppSecretsProps) 
     const [newSecretName, setNewSecretName] = useState("")
     const [kvPairs, setKvPairs] = useState<{ key: string; value: string }[]>([{ key: "", value: "" }])
 
+    // Delete Confirmation
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+    const [secretToDelete, setSecretToDelete] = useState<string | null>(null)
+
     useEffect(() => {
         loadSecrets(namespace, appName).then(setSecrets)
     }, [appName, namespace])
@@ -59,11 +63,13 @@ export function AppSecrets({ appName, namespace, secretRefs }: AppSecretsProps) 
         setLoading(false)
     }
 
-    const handleDelete = async (name: string) => {
-        if (!confirm("Are you sure? This will remove the secret from the app and delete it.")) return
+    const handleDelete = async () => {
+        if (!secretToDelete) return
         setLoading(true)
-        await removeSecret(namespace, appName, name)
+        await removeSecret(namespace, appName, secretToDelete)
         loadSecrets(namespace, appName).then(setSecrets)
+        setSecretToDelete(null)
+        setDeleteConfirmOpen(false)
         setLoading(false)
     }
 
@@ -144,7 +150,15 @@ export function AppSecrets({ appName, namespace, secretRefs }: AppSecretsProps) 
                                             </div>
                                         </div>
                                     </div>
-                                    <Button size="icon" variant="ghost" className="text-destructive" onClick={() => handleDelete(s.name)}>
+                                    <Button 
+                                        size="icon" 
+                                        variant="ghost" 
+                                        className="text-destructive" 
+                                        onClick={() => {
+                                            setSecretToDelete(s.name)
+                                            setDeleteConfirmOpen(true)
+                                        }}
+                                    >
                                         <Trash2 className="w-4 h-4" />
                                     </Button>
                                 </div>
@@ -152,6 +166,26 @@ export function AppSecrets({ appName, namespace, secretRefs }: AppSecretsProps) 
                         </div>
                     )}
                 </div>
+
+                <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Delete Secret</DialogTitle>
+                            <DialogDescription>
+                                Are you sure you want to delete the secret <strong>{secretToDelete}</strong>? 
+                                This will remove it from the application and delete the data permanently.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)} disabled={loading}>
+                                Cancel
+                            </Button>
+                            <Button variant="destructive" onClick={handleDelete} disabled={loading}>
+                                {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "Delete Secret"}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </CardContent>
         </Card>
     )

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Cpu, MemoryStick, Box, Loader2, Zap } from "lucide-react"
+import { Cpu, MemoryStick, Box, Loader2, Zap, Database } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface QuotaData {
@@ -80,14 +80,15 @@ function UsageDetail({ label, used, hard, unit, icon: Icon, color, isCpu }: any)
     )
 }
 
-export function ResourceUsage({ data: initialData }: { data?: QuotaData }) {
+export function ResourceUsage({ data: initialData, username }: { data?: QuotaData, username?: string }) {
     const [data, setData] = useState<QuotaData | null>(initialData || null)
     const [loading, setLoading] = useState(!initialData)
 
     useEffect(() => {
         const fetchQuotas = async () => {
             try {
-                const res = await fetch("/api/user/quotas")
+                const url = username ? `/api/admin/users/${username}/quotas` : "/api/user/quotas"
+                const res = await fetch(url, { cache: 'no-store' })
                 if (res.ok) {
                     const json = await res.json()
                     setData(json)
@@ -119,7 +120,7 @@ export function ResourceUsage({ data: initialData }: { data?: QuotaData }) {
                 <div className="flex items-center justify-between">
                     <CardTitle className="text-[11px] font-black uppercase tracking-[0.2em] opacity-60 flex items-center gap-2">
                         <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                        My Plan Usage
+                        Resource Quota
                     </CardTitle>
                     <Badge variant="outline" className="text-[9px] h-4 font-bold border-primary/20 bg-primary/5 text-primary">Live</Badge>
                 </div>
@@ -149,6 +150,14 @@ export function ResourceUsage({ data: initialData }: { data?: QuotaData }) {
                     unit="" 
                     icon={Box} 
                     color="text-emerald-500" 
+                />
+                <UsageDetail 
+                    label="Disk Storage" 
+                    used={data.used["requests.storage"] || data.used["storage"]} 
+                    hard={data.hard["requests.storage"] || data.hard["storage"]} 
+                    unit="" 
+                    icon={Database} 
+                    color="text-amber-500" 
                 />
             </CardContent>
         </Card>
