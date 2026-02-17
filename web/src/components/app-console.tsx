@@ -54,8 +54,7 @@ export function AppConsole({ namespace, appName, podName }: AppConsoleProps) {
                 ws.onopen = () => {
                     setIsConnected(true)
                     setError(null)
-                    term.writeln('\x1b[32m[Gitship] Connected to container shell.\x1b[0m
-')
+                    term.writeln('\x1b[32m[Gitship] Connected to container shell.\x1b[0m\r\n')
                 }
 
                 ws.onmessage = (event) => {
@@ -65,8 +64,7 @@ export function AppConsole({ namespace, appName, podName }: AppConsoleProps) {
                 ws.onclose = (event) => {
                     setIsConnected(false)
                     if (event.code !== 1000) {
-                        term.writeln('
-\x1b[31m[Gitship] Connection closed.\x1b[0m')
+                        term.writeln('\r\n\x1b[31m[Gitship] Connection closed.\x1b[0m')
                     }
                 }
 
