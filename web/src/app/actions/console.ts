@@ -1,8 +1,8 @@
 "use server"
 
 import { auth } from "@/auth"
-import { hasNamespaceAccess } from "./auth-utils"
-import { createConsoleToken } from "./tokens"
+import { hasNamespaceAccess } from "@/lib/auth-utils"
+import { createConsoleToken } from "@/lib/tokens"
 
 export async function generateConsoleTokenAction(namespace: string, podName: string) {
   const session = await auth()
