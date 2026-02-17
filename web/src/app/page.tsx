@@ -24,7 +24,7 @@ export default async function Home() {
     
     // Ensure user record exists, keyed by GitHub ID
     await ensureGitshipUser(username, parseInt(githubId))
-    const namespace = `gitship-${internalId}`
+    const namespace = `gitship-${internalId}` // Result: gitship-u-ID
     
     role = await getUserRole(internalId)
 
