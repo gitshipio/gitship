@@ -1,0 +1,16 @@
+{{- if and .Values.registry.enabled .Values.registry.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gitship-registry-pvc
+  namespace: {{ .Values.controller.config.systemNamespace }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.registry.persistence.size }}
+  {{- if .Values.registry.persistence.storageClassName }}
+  storageClassName: {{ .Values.registry.persistence.storageClassName }}
+  {{- end }}
+{{- end }}

@@ -1,0 +1,16 @@
+{{- if .Values.registry.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitship-registry
+  namespace: {{ .Values.controller.config.systemNamespace }}
+spec:
+  type: NodePort
+  selector:
+    app: gitship-registry
+  ports:
+    - name: registry
+      port: 5000
+      targetPort: 5000
+      nodePort: 30005
+{{- end }}

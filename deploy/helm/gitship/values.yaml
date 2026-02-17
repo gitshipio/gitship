@@ -28,11 +28,40 @@ dashboard:
 
 registry:
   enabled: true # Whether to deploy the internal registry
+  persistence:
+    enabled: false
+    size: 20Gi
+    storageClassName: "" # Leave empty for default
+
+controller:
+  config:
+    registryPushUrl: "" # Defaults to internal service
+    registryPullUrl: "" # Defaults to RegistryPushUrl
+    systemNamespace: "gitship-system"
+    clusterIssuer: "letsencrypt-prod"
+    ingressClassName: "nginx"
+    defaultStorageClass: "" # Used for App PVCs if not specified
+    images:
+      git: "alpine/git"
+      kaniko: "gcr.io/kaniko-project/executor:latest"
+
+quotas:
+  pods: "20"
+  storage: "10Gi"
+  requests:
+    cpu: "4"
+    memory: "8Gi"
+  limits:
+    cpu: "8"
+    memory: "16Gi"
 
 github:
   clientId: ""
   clientSecret: ""
   appName: ""
+  webhookSecret: ""
 
 auth:
   secret: "change-me-to-a-random-string"
+  existingSecret: "" # Use an existing secret for AUTH_SECRET, AUTH_GITHUB_ID, etc.
+  # url: "https://gitship.local" # Optional: Specify to override dynamic detection

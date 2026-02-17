@@ -1,0 +1,10 @@
+resources:
+- rbac.yaml
+- config.yaml
+- deployment.yaml
+- service.yaml
+
+images:
+- name: gitship-dashboard
+  newName: gitshipio/gitship-dashboard
+  newTag: latest

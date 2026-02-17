@@ -25,6 +25,30 @@ spec:
           env:
             - name: WATCH_NAMESPACE
               value: ""
+            - name: REGISTRY_PUSH_URL
+              value: {{ .Values.controller.config.registryPushUrl | quote }}
+            - name: REGISTRY_PULL_URL
+              value: {{ .Values.controller.config.registryPullUrl | quote }}
+            - name: SYSTEM_NAMESPACE
+              value: {{ .Values.controller.config.systemNamespace | quote }}
+            - name: CLUSTER_ISSUER
+              value: {{ .Values.controller.config.clusterIssuer | quote }}
+            - name: INGRESS_CLASS_NAME
+              value: {{ .Values.controller.config.ingressClassName | quote }}
+            - name: DEFAULT_STORAGE_CLASS
+              value: {{ .Values.controller.config.defaultStorageClass | quote }}
+            - name: QUOTA_CPU
+              value: {{ .Values.quotas.limits.cpu | quote }}
+            - name: QUOTA_RAM
+              value: {{ .Values.quotas.limits.memory | quote }}
+            - name: QUOTA_PODS
+              value: {{ .Values.quotas.pods | quote }}
+            - name: QUOTA_STORAGE
+              value: {{ .Values.quotas.storage | quote }}
+            - name: IMAGE_GIT
+              value: {{ .Values.controller.config.images.git | quote }}
+            - name: IMAGE_KANIKO
+              value: {{ .Values.controller.config.images.kaniko | quote }}
           resources:
             limits:
               cpu: 500m

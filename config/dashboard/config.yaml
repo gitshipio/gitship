@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-config
+data:
+  AUTH_URL: "http://localhost:3000" # Change this to your public domain (e.g. https://gitship.example.com)
+  NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+  SYSTEM_NAMESPACE: "gitship-system"
+  QUOTA_PODS: "20"
+  QUOTA_CPU_REQ: "4"
+  QUOTA_MEM_REQ: "8Gi"
+  QUOTA_CPU_LIM: "8"
+  QUOTA_MEM_LIM: "16Gi"
+  QUOTA_STORAGE: "10Gi"

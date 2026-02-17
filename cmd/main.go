@@ -19,6 +19,7 @@ package main
 import (
 	"crypto/tls"
 	"flag"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -56,6 +57,13 @@ func init() {
 	// +kubebuilder:scaffold:scheme
 }
 
+func getEnv(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	return fallback
+}
+
 // nolint:gocyclo
 func main() {
 	var metricsAddr string
@@ -90,6 +98,25 @@ func main() {
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	// Load configuration
+	systemNamespace := getEnv("SYSTEM_NAMESPACE", "gitship-system")
+	defaultPushURL := fmt.Sprintf("gitship-registry.%s.svc.cluster.local:5000", systemNamespace)
+
+	config := gitshipiocontroller.ControllerConfig{
+		RegistryPushURL:     getEnv("REGISTRY_PUSH_URL", defaultPushURL),
+		RegistryPullURL:     getEnv("REGISTRY_PULL_URL", ""),
+		SystemNamespace:     systemNamespace,
+		ClusterIssuer:       getEnv("CLUSTER_ISSUER", "letsencrypt-prod"),
+		IngressClassName:    getEnv("INGRESS_CLASS_NAME", "nginx"),
+		DefaultStorageClass: getEnv("DEFAULT_STORAGE_CLASS", ""),
+		DefaultQuotaCPU:     getEnv("QUOTA_CPU", "4"),
+		DefaultQuotaRAM:     getEnv("QUOTA_RAM", "8Gi"),
+		DefaultQuotaPods:    getEnv("QUOTA_PODS", "20"),
+		DefaultQuotaStorage: getEnv("QUOTA_STORAGE", "10Gi"),
+		ImageGit:            getEnv("IMAGE_GIT", "alpine/git"),
+		ImageKaniko:         getEnv("IMAGE_KANIKO", "gcr.io/kaniko-project/executor:latest"),
+	}
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
@@ -201,6 +228,7 @@ func main() {
 	if err := (&gitshipiocontroller.GitshipUserReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
+		Config: config,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "GitshipUser")
 		os.Exit(1)
@@ -208,6 +236,7 @@ func main() {
 	if err := (&gitshipiocontroller.GitshipAppReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
+		Config: config,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "GitshipApp")
 		os.Exit(1)

@@ -22,14 +22,61 @@ spec:
           ports:
             - containerPort: 3000
           env:
+            - name: AUTH_TRUST_HOST
+              value: "true"
+            {{- if .Values.auth.url }}
+            - name: AUTH_URL
+              value: {{ .Values.auth.url | quote }}
+            - name: NEXT_PUBLIC_APP_URL
+              value: {{ .Values.auth.url | quote }}
+            {{- end }}
+            {{- if .Values.auth.existingSecret }}
+            - name: AUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.auth.existingSecret }}
+                  key: AUTH_SECRET
+            - name: AUTH_GITHUB_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.auth.existingSecret }}
+                  key: AUTH_GITHUB_ID
+            - name: AUTH_GITHUB_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.auth.existingSecret }}
+                  key: AUTH_GITHUB_SECRET
+            - name: GITHUB_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.auth.existingSecret }}
+                  key: GITHUB_WEBHOOK_SECRET
+            {{- else }}
             - name: AUTH_SECRET
               value: {{ .Values.auth.secret | quote }}
             - name: AUTH_GITHUB_ID
               value: {{ .Values.github.clientId | quote }}
             - name: AUTH_GITHUB_SECRET
               value: {{ .Values.github.clientSecret | quote }}
+            - name: GITHUB_WEBHOOK_SECRET
+              value: {{ .Values.github.webhookSecret | quote }}
+            {{- end }}
             - name: NEXT_PUBLIC_GITHUB_APP_NAME
               value: {{ .Values.github.appName | quote }}
+            - name: SYSTEM_NAMESPACE
+              value: {{ .Values.controller.config.systemNamespace | quote }}
+            - name: QUOTA_PODS
+              value: {{ .Values.quotas.pods | quote }}
+            - name: QUOTA_CPU_REQ
+              value: {{ .Values.quotas.requests.cpu | quote }}
+            - name: QUOTA_MEM_REQ
+              value: {{ .Values.quotas.requests.memory | quote }}
+            - name: QUOTA_CPU_LIM
+              value: {{ .Values.quotas.limits.cpu | quote }}
+            - name: QUOTA_MEM_LIM
+              value: {{ .Values.quotas.limits.memory | quote }}
+            - name: QUOTA_STORAGE
+              value: {{ .Values.quotas.storage | quote }}
 ---
 apiVersion: v1
 kind: Service

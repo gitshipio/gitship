@@ -1,0 +1,35 @@
+{{- if .Values.registry.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitship-registry
+  namespace: {{ .Values.controller.config.systemNamespace }}
+  labels:
+    app: gitship-registry
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gitship-registry
+  template:
+    metadata:
+      labels:
+        app: gitship-registry
+    spec:
+      containers:
+      - name: registry
+        image: registry:2
+        ports:
+        - containerPort: 5000
+        volumeMounts:
+        - name: storage
+          mountPath: /var/lib/registry
+      volumes:
+      - name: storage
+        {{- if .Values.registry.persistence.enabled }}
+        persistentVolumeClaim:
+          claimName: gitship-registry-pvc
+        {{- else }}
+        emptyDir: {}
+        {{- end }}
+{{- end }}

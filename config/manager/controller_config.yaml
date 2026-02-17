@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: controller-config
+data:
+  REGISTRY_PUSH_URL: "" # Leave empty for dynamic default (gitship-registry.gitship-system...)
+  REGISTRY_PULL_URL: "" # Leave empty for smart fallback (localhost:30005 or Push URL)
+  SYSTEM_NAMESPACE: "gitship-system"
+  CLUSTER_ISSUER: "letsencrypt-prod"
+  INGRESS_CLASS_NAME: "nginx"
+  DEFAULT_STORAGE_CLASS: ""
+  QUOTA_CPU: "4"
+  QUOTA_RAM: "8Gi"
+  QUOTA_PODS: "20"
+  QUOTA_STORAGE: "10Gi"
+  IMAGE_GIT: "alpine/git"
+  IMAGE_KANIKO: "gcr.io/kaniko-project/executor:latest"

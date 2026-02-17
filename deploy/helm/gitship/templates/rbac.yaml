@@ -1,0 +1,79 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "gitship.fullname" . }}-controller-role
+rules:
+  - apiGroups: ["gitship.io"]
+    resources: ["gitshipapps", "gitshipusers", "users", "repowatchers"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["gitship.io"]
+    resources: ["gitshipapps/status", "gitshipusers/status", "users/status", "repowatchers/status"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: ["gitship.io"]
+    resources: ["gitshipapps/finalizers", "gitshipusers/finalizers", "users/finalizers", "repowatchers/finalizers"]
+    verbs: ["update"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["services", "secrets", "pods", "persistentvolumeclaims", "namespaces", "resourcequotas"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses", "networkpolicies"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "gitship.fullname" . }}-controller-rolebinding
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "gitship.fullname" . }}-controller
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: ClusterRole
+  name: {{ include "gitship.fullname" . }}-controller-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "gitship.fullname" . }}-dashboard-role
+rules:
+  - apiGroups: ["gitship.io"]
+    resources: ["gitshipapps", "gitshipusers", "users"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["namespaces", "nodes", "persistentvolumeclaims", "secrets", "services", "pods", "pods/log", "events", "resourcequotas"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets", "replicasets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses", "ingressclasses", "networkpolicies"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["pods", "nodes"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "gitship.fullname" . }}-dashboard-rolebinding
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "gitship.fullname" . }}-dashboard
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: ClusterRole
+  name: {{ include "gitship.fullname" . }}-dashboard-role
+  apiGroup: rbac.authorization.k8s.io
