@@ -6,7 +6,7 @@ import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/auth"
 import { getGitshipUser } from "./api"
-import { resolveUserSession } from "./auth-utils"
+import { hasNamespaceAccess, resolveUserSession } from "./auth-utils"
 
 export async function getCurrentUserRole(): Promise<string> {
   const session = await auth()
@@ -19,6 +19,13 @@ export async function getCurrentUserRole(): Promise<string> {
 }
 
 export async function deleteApp(name: string, namespace: string = "default") {
+  const session = await auth()
+  
+  // Security Check
+  if (!await hasNamespaceAccess(namespace, session)) {
+    throw new Error("Access Denied")
+  }
+
   try {
     await k8sCustomApi.deleteNamespacedCustomObject({
       group: "gitship.io",

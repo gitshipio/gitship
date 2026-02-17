@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { k8sCoreApi } from "@/lib/k8s"
+import { hasNamespaceAccess } from "@/lib/auth-utils"
 
 export async function GET(req: NextRequest) {
   const session = await auth()
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
   const { searchParams } = new URL(req.url)
   const name = searchParams.get("name")
   const namespace = searchParams.get("namespace") || "default"
+
+  // Security Check
+  if (!await hasNamespaceAccess(namespace, session)) {
+    return NextResponse.json({ error: "Access Denied" }, { status: 403 })
+  }
+
   const podNameParam = searchParams.get("podName")
   const tailLines = parseInt(searchParams.get("tailLines") || "200")
 

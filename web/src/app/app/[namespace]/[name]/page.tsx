@@ -1,7 +1,7 @@
 
 import { auth } from "@/auth"
 import { getGitshipApp } from "@/lib/api"
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, ExternalLink } from "lucide-react"
@@ -9,12 +9,17 @@ import Link from "next/link"
 import { DeleteAppButton } from "@/components/delete-app-button"
 import { AppDetailTabs } from "@/components/app-detail-tabs"
 import { RefreshTrigger } from "@/components/refresh-trigger"
+import { hasNamespaceAccess } from "@/lib/auth-utils"
 
 export default async function AppDetailsPage({ params }: { params: Promise<{ namespace: string; name: string }> }) {
     const session = await auth()
-    if (!session) return <div>Access Denied</div>
-
     const { namespace, name } = await params
+
+    // Security Check: Ensure user has access to this namespace
+    if (!await hasNamespaceAccess(namespace, session)) {
+        redirect("/")
+    }
+
     const app = await getGitshipApp(name, namespace)
 
     if (!app) {

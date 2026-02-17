@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { k8sCoreApi, k8sBatchApi } from "@/lib/k8s"
+import { hasNamespaceAccess } from "@/lib/auth-utils"
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ namespace: string, name: string }> }
 ) {
   const session = await auth()
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
   const { namespace, name } = await params
+
+  // Security Check
+  if (!await hasNamespaceAccess(namespace, session)) {
+    return NextResponse.json({ error: "Access Denied" }, { status: 403 })
+  }
 
   try {
     // 1. Find the latest build job for this app

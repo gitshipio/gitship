@@ -1,15 +1,20 @@
 import { auth } from "@/auth"
 import { k8sCustomApi } from "@/lib/k8s"
 import { NextResponse } from "next/server"
+import { hasNamespaceAccess } from "@/lib/auth-utils"
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ namespace: string; name: string }> }
 ) {
   const session = await auth()
-  if (!session) return new NextResponse("Unauthorized", { status: 401 })
-
   const { namespace, name } = await params
+
+  // Security Check
+  if (!await hasNamespaceAccess(namespace, session)) {
+    return NextResponse.json({ error: "Access Denied" }, { status: 403 })
+  }
+
   const { commitId } = await request.json()
 
   if (!commitId) return NextResponse.json({ error: "commitId is required" }, { status: 400 })

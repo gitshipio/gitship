@@ -19,28 +19,28 @@ export default async function Home() {
   let quotas = null
   let role = "restricted"
 
+  let userNamespace = ""
   if (session?.user) {
     const { githubId, username, internalId } = resolveUserSession(session)
     
     // Ensure user record exists, keyed by GitHub ID
     await ensureGitshipUser(username, parseInt(githubId))
-    const namespace = `gitship-${internalId}` // Result: gitship-u-ID
+    userNamespace = `gitship-${internalId}` // Result: gitship-u-ID
     
     role = await getUserRole(internalId)
 
     if (role !== "restricted") {
         // Sync GitHub token to the namespace for the operator to use
         if ((session as any).accessToken) {
-            await ensureGitHubSecret(namespace, (session as any).accessToken)
+            await ensureGitHubSecret(userNamespace, (session as any).accessToken)
         }
 
         quotas = await getUserQuotas(internalId)
     }
   }
 
-  // List all apps the user has access to (across all namespaces)
-  // Only fetch apps if user is not restricted
-  const appsList = (session && role !== "restricted") ? (await getGitshipApps()) : { items: [] }
+  // Only fetch apps from the user's namespace to ensure multi-tenancy
+  const appsList = (session && role !== "restricted") ? (await getGitshipApps(userNamespace)) : { items: [] }
   const plainQuotas = quotas ? JSON.parse(JSON.stringify(quotas)) : null
   const hasApps = appsList.items && appsList.items.length > 0
 
