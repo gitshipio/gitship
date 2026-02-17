@@ -50,3 +50,11 @@ user-*.yaml
 test-app.yaml
 test-cr.yaml
 test-repo.yaml
+
+# Web Artifacts
+web/.next/
+web/node_modules/
+web/.vercel/
+web/tsconfig.tsbuildinfo
+web/next-env.d.ts
+web/debug-k8s.js

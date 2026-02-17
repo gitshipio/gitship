@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { k8sCustomApi } from "@/lib/k8s"
-import { isAdmin as checkAdmin } from "@/lib/auth-utils"
+import { isAdmin as checkAdmin, resolveUserSession } from "@/lib/auth-utils"
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ name: string }> }
 ) {
   const session: any = await auth()
-  const username = session?.user?.githubUsername || session?.user?.name
+  const { internalId: adminId } = resolveUserSession(session)
   
   // Admin Check
-  const isUserAdmin = await checkAdmin(username)
+  const isUserAdmin = await checkAdmin(adminId)
   if (!isUserAdmin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const { name } = await params

@@ -62,6 +62,9 @@ spec:
                   pods:
                     description: Maximum number of Pods
                     type: string
+                  storage:
+                    description: Maximum Storage (e.g. "10Gi")
+                    type: string
                 type: object
               registries:
                 description: Saved registries for this user

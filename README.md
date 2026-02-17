@@ -1,4 +1,4 @@
-# 🚢 Gitship
+# <img src="web/public/logo.svg" width="40" height="40" align="center" style="margin-right: 10px;" /> Gitship
 
 **Gitship** is a Kubernetes-native PaaS designed for zero-config deployments. Just push your code, and Gitship handles the rest—building container images, managing deployments, and providing real-time monitoring.
 
@@ -26,6 +26,7 @@ kubectl apply -f https://github.com/gitshipio/gitship/releases/latest/download/i
 Before using the dashboard, create the required secret in the `gitship-system` namespace. You will need a GitHub OAuth App.
 
 ```bash
+kubectl create namespace gitship-system
 kubectl create secret generic gitship-dashboard-secrets -n gitship-system \
   --from-literal=AUTH_SECRET=$(openssl rand -base64 32) \
   --from-literal=AUTH_GITHUB_ID=your_github_client_id \
@@ -34,6 +35,20 @@ kubectl create secret generic gitship-dashboard-secrets -n gitship-system \
 ```
 
 Once deployed, access the dashboard via the created Service or Ingress (depending on your cluster setup).
+
+### Customization
+
+You can customize the registry, resource quotas, and image defaults by editing the ConfigMaps before or after deployment:
+
+- **Controller Config**: `gitship-controller-config` (in `gitship-system`)
+- **Dashboard Config**: `gitship-dashboard-config` (in `gitship-system`)
+
+Example to change the registry:
+```bash
+kubectl edit configmap gitship-controller-config -n gitship-system
+# Change REGISTRY_PULL_URL and REGISTRY_PUSH_URL, then restart:
+kubectl rollout restart deployment gitship-controller-manager -n gitship-system
+```
 
 ## Usage
 

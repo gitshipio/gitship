@@ -54,6 +54,9 @@ spec:
                   pods:
                     description: Maximum number of Pods
                     type: string
+                  storage:
+                    description: Maximum Storage (e.g. "10Gi")
+                    type: string
                 type: object
               username:
                 description: Username is the unique identifier for the user

@@ -5,6 +5,7 @@ import { getUserRepositories } from "@/lib/github"
 import { getGitshipUser } from "@/lib/api"
 import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { resolveUserSession } from "@/lib/auth-utils"
 
 export default async function NewAppPage() {
     const session = await auth()
@@ -12,12 +13,11 @@ export default async function NewAppPage() {
         redirect("/api/auth/signin")
     }
 
-    const username = (session.user as any).githubUsername || session.user.name || "unknown"
-    const sanitized = username.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/^-|-$/g, "")
+    const { internalId } = resolveUserSession(session)
 
     const [repos, user] = await Promise.all([
         getUserRepositories(),
-        getGitshipUser(sanitized)
+        getGitshipUser(internalId)
     ])
 
     const githubAppName = process.env.NEXT_PUBLIC_GITHUB_APP_NAME

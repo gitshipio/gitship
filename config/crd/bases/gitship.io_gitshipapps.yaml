@@ -46,9 +46,9 @@ spec:
                     name:
                       description: Name of the addon instance
                       type: string
-                    plan:
+                    size:
                       default: small
-                      description: Plan or size (e.g. "small", "medium")
+                      description: Size of the addon instance (e.g. "small", "medium")
                       type: string
                     type:
                       description: Type of addon (e.g. "postgres", "redis")

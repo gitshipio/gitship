@@ -22,6 +22,12 @@ export async function GET(req: NextRequest) {
     const branchesRes = await fetch(`https://api.github.com/repos/${owner}/${repoName}/branches`, {
         headers: { Authorization: `Bearer ${token}` }
     })
+    
+    if (!branchesRes.ok) {
+        if (branchesRes.status === 404) return NextResponse.json({ error: "Repository not found or access denied." }, { status: 404 })
+        throw new Error("Failed to fetch branches")
+    }
+
     const branches = await branchesRes.json()
 
     // 2. Fetch Tags
