@@ -21,6 +21,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -38,6 +39,7 @@ import (
 type GitshipUserReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+	Config ControllerConfig
 }
 
 // +kubebuilder:rbac:groups=gitship.io,resources=gitshipusers,verbs=get;list;watch;create;update;patch;delete
@@ -59,10 +61,11 @@ func (r *GitshipUserReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	log.Info("Reconciling GitshipUser", "user", gitshipUser.Spec.GitHubUsername)
+	log.Info("Reconciling GitshipUser", "user", gitshipUser.Spec.GitHubUsername, "id", gitshipUser.Name)
 
 	expectedNamespaces := []string{}
-	baseNamespace := "gitship-user-" + gitshipUser.Spec.GitHubUsername
+	// Use the metadata name (u-ID) as the base for the namespace
+	baseNamespace := "gitship-" + gitshipUser.Name
 	expectedNamespaces = append(expectedNamespaces, baseNamespace)
 
 	for _, suffix := range gitshipUser.Spec.CustomSpaces {
@@ -85,7 +88,8 @@ func (r *GitshipUserReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 					Name: nsName,
 					Labels: map[string]string{
 						"app.kubernetes.io/managed-by": "gitship-controller",
-						"gitship.io/user":              gitshipUser.Spec.GitHubUsername,
+						"gitship.io/user":              gitshipUser.Name,
+						"gitship.io/github-username":   strings.ToLower(gitshipUser.Spec.GitHubUsername),
 					},
 				},
 			}
@@ -94,7 +98,7 @@ func (r *GitshipUserReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 				return ctrl.Result{}, err
 			}
 		}
-		
+
 		for _, reg := range gitshipUser.Spec.Registries {
 			if err := r.ensureRegistrySecret(ctx, nsName, reg); err != nil {
 				log.Error(err, "Failed to sync registry secret", "namespace", nsName, "registry", reg.Name)
@@ -126,7 +130,7 @@ func (r *GitshipUserReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 func (r *GitshipUserReconciler) ensureRegistrySecret(ctx context.Context, namespace string, reg gitshipiov1alpha1.RegistryConfig) error {
 	secretName := fmt.Sprintf("gitship-registry-%s", reg.Name)
-	
+
 	dockerConfig, err := createDockerConfigJSON(reg.Server, reg.Username, reg.Password)
 	if err != nil {
 		return err
@@ -134,7 +138,7 @@ func (r *GitshipUserReconciler) ensureRegistrySecret(ctx context.Context, namesp
 
 	secret := &corev1.Secret{}
 	err = r.Get(ctx, client.ObjectKey{Namespace: namespace, Name: secretName}, secret)
-	
+
 	if err != nil && client.IgnoreNotFound(err) != nil {
 		return err
 	}
@@ -166,22 +170,51 @@ func (r *GitshipUserReconciler) ensureRegistrySecret(ctx context.Context, namesp
 
 func (r *GitshipUserReconciler) ensureResourceQuota(ctx context.Context, namespace string, quotas gitshipiov1alpha1.UserQuotas) error {
 	quotaName := "user-quota"
-	
-	// Default values if not set
+
+	// Use defaults from config if not set in CRD
 	cpu := quotas.CPU
-	if cpu == "" { cpu = "4" }
+	if cpu == "" {
+		cpu = r.Config.DefaultQuotaCPU
+	}
+	if cpu == "" {
+		cpu = "4"
+	} // Final fallback
+
 	mem := quotas.Memory
-	if mem == "" { mem = "8Gi" }
+	if mem == "" {
+		mem = r.Config.DefaultQuotaRAM
+	}
+	if mem == "" {
+		mem = "8Gi"
+	}
+
 	pods := quotas.Pods
-	if pods == "" { pods = "20" }
+	if pods == "" {
+		pods = r.Config.DefaultQuotaPods
+	}
+	if pods == "" {
+		pods = "20"
+	}
+
+	storage := quotas.Storage
+	if storage == "" {
+		storage = r.Config.DefaultQuotaStorage
+	}
+	if storage == "" {
+		storage = "10Gi"
+	}
 
 	targetResources := corev1.ResourceList{
-		corev1.ResourceRequestsCPU:    resource.MustParse(cpu),
-		corev1.ResourceLimitsCPU:      resource.MustParse(cpu),
-		corev1.ResourceRequestsMemory: resource.MustParse(mem),
-		corev1.ResourceLimitsMemory:   resource.MustParse(mem),
-		corev1.ResourcePods:           resource.MustParse(pods),
+		corev1.ResourceRequestsCPU:     resource.MustParse(cpu),
+		corev1.ResourceLimitsCPU:       resource.MustParse(cpu),
+		corev1.ResourceRequestsMemory:  resource.MustParse(mem),
+		corev1.ResourceLimitsMemory:    resource.MustParse(mem),
+		corev1.ResourcePods:            resource.MustParse(pods),
+		corev1.ResourceRequestsStorage: resource.MustParse(storage),
 	}
+
+	log := logf.Log.WithName("gitshipuser-controller")
+	log.Info("Applying ResourceQuota", "namespace", namespace, "resources", targetResources)
 
 	quota := &corev1.ResourceQuota{}
 	err := r.Get(ctx, client.ObjectKey{Namespace: namespace, Name: quotaName}, quota)
@@ -214,7 +247,7 @@ func (r *GitshipUserReconciler) ensureResourceQuota(ctx context.Context, namespa
 
 func (r *GitshipUserReconciler) ensureNetworkPolicy(ctx context.Context, namespace string) error {
 	policyName := "isolate-user"
-	
+
 	policy := &networkingv1.NetworkPolicy{}
 	err := r.Get(ctx, client.ObjectKey{Namespace: namespace, Name: policyName}, policy)
 
@@ -227,7 +260,7 @@ func (r *GitshipUserReconciler) ensureNetworkPolicy(ctx context.Context, namespa
 		return nil
 	}
 
-	// Create default policy: Allow all in namespace, allow from gitship-system (Ingress), deny others
+	// Create default policy: Allow all in namespace, allow from system namespace (Ingress), deny others
 	newPolicy := &networkingv1.NetworkPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      policyName,
@@ -253,12 +286,12 @@ func (r *GitshipUserReconciler) ensureNetworkPolicy(ctx context.Context, namespa
 					},
 				},
 				{
-					// Allow from gitship-system (for Ingress/Health probes)
+					// Allow from system namespace (for Ingress/Health probes)
 					From: []networkingv1.NetworkPolicyPeer{
 						{
 							NamespaceSelector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{
-									"kubernetes.io/metadata.name": "gitship-system",
+									"kubernetes.io/metadata.name": r.Config.SystemNamespace,
 								},
 							},
 						},

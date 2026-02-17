@@ -152,14 +152,16 @@ export async function getAppIngress(name: string, namespace: string) {
 }
 
 export async function getUserQuotas(username: string) {
-    const namespace = `gitship-user-${username.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/^-|-$/g, "")}`
+    // try new ID-based naming first, then fallback to legacy
+    const namespace = username.startsWith("u-") ? `gitship-${username}` : `gitship-user-${username.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/^-|-$/g, "")}`
     console.log(`[QUOTA] Fetching quotas for user '${username}' in namespace '${namespace}'`)
     try {
-        const resp = await k8sCoreApi.readNamespacedResourceQuota({ name: "user-quota", namespace })
-        console.log(`[QUOTA] Successfully fetched quota for ${namespace}. Hard keys: ${Object.keys(resp.status?.hard || {}).join(",")}`)
+        const resp: any = await k8sCoreApi.readNamespacedResourceQuota({ name: "user-quota", namespace })
+        const quota = resp.body || resp
+        console.log(`[QUOTA] Successfully fetched quota for ${namespace}. Hard keys: ${Object.keys(quota.status?.hard || {}).join(",")}`)
         return {
-            hard: resp.status?.hard || {},
-            used: resp.status?.used || {}
+            hard: quota.status?.hard || {},
+            used: quota.status?.used || {}
         }
     } catch (err: any) {
         console.error(`[QUOTA] Failed to fetch quota for ${namespace}:`, err.body?.message || err.message)

@@ -10,7 +10,7 @@ import { RefreshTrigger } from "@/components/refresh-trigger"
 import { ResourceUsage } from "@/components/resource-usage"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { UserMonitoring } from "@/components/user-monitoring"
-import { getUserRole } from "@/lib/auth-utils"
+import { getUserRole, resolveUserSession } from "@/lib/auth-utils"
 
 export const dynamic = 'force-dynamic'
 
@@ -20,12 +20,13 @@ export default async function Home() {
   let role = "restricted"
 
   if (session?.user) {
-    // Resolve username: prioritize githubUsername, fallback to name
-    const username = (session.user as any).githubUsername || session.user.name || "unknown"
-    const sanitized = await ensureGitshipUser(username, 0)
-    const namespace = `gitship-user-${sanitized}`
+    const { githubId, username, internalId } = resolveUserSession(session)
     
-    role = await getUserRole(username)
+    // Ensure user record exists, keyed by GitHub ID
+    await ensureGitshipUser(username, parseInt(githubId))
+    const namespace = `gitship-${internalId}`
+    
+    role = await getUserRole(internalId)
 
     if (role !== "restricted") {
         // Sync GitHub token to the namespace for the operator to use
@@ -33,7 +34,7 @@ export default async function Home() {
             await ensureGitHubSecret(namespace, (session as any).accessToken)
         }
 
-        quotas = await getUserQuotas(username)
+        quotas = await getUserQuotas(internalId)
     }
   }
 
@@ -46,8 +47,8 @@ export default async function Home() {
   if (!session) {
     return (
       <div className="flex min-h-[calc(100vh-60px)] flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in duration-500">
-        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-muted/50 mb-8 border border-border/50">
-            <span className="text-4xl font-bold text-primary">G</span>
+        <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-3xl bg-muted/50 mb-8 border border-border/50 shadow-sm p-4">
+            <img src="/logo.svg" alt="Gitship Logo" className="w-full h-full object-contain" />
         </div>
         <h1 className="text-4xl font-extrabold tracking-tight lg:text-5xl mb-4 bg-gradient-to-r from-foreground to-foreground/60 bg-clip-text text-transparent">
           Deploy from Git to Kubernetes.
@@ -155,7 +156,7 @@ export default async function Home() {
                 </TabsContent>
 
                 <TabsContent value="monitoring" className="mt-0 border-none p-0 outline-none">
-                    <UserMonitoring data={null as any} />
+                    <UserMonitoring />
                 </TabsContent>
             </Tabs>
         </div>

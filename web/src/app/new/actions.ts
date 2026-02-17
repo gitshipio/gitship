@@ -9,6 +9,8 @@ import { generateSSHKeyPair } from "@/lib/ssh"
 import { createSecret } from "@/lib/secrets"
 import { redirect } from "next/navigation"
 import { z } from "zod"
+import { headers } from "next/headers"
+import { resolveUserSession } from "@/lib/auth-utils"
 
 const createAppSchema = z.object({
   name: z.string().min(3).regex(/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/, "Must be a valid DNS label"),
@@ -41,13 +43,12 @@ const createAppSchema = z.object({
 
 export async function createApp(formData: FormData) {
   const session = await auth()
-  if (!session || !session.user?.name) {
+  if (!session || !session.user) {
     return { message: "Unauthorized" }
   }
 
-  const username = (session.user as any).githubUsername || session.user.name || "unknown"
-  const sanitized = username.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/^-|-$/g, "")
-  const user = await getGitshipUser(sanitized)
+  const { internalId } = resolveUserSession(session)
+  const user = await getGitshipUser(internalId)
 
   if (user?.spec.role === "restricted") {
     return { message: "Access Denied: Your account is restricted. You can manage registries but cannot create new applications." }
@@ -79,8 +80,8 @@ export async function createApp(formData: FormData) {
 
   const data = validatedFields.data
 
-  // Use sanitized username already resolved above
-  const namespace = await ensureUserNamespace(sanitized)
+  // Use stable internalId for the namespace
+  const namespace = await ensureUserNamespace(internalId)
 
   // 1. Setup SSH Authentication
   let authMethod = "token"
@@ -165,8 +166,12 @@ export async function createApp(formData: FormData) {
 
   // Attempt to create Webhook if strategy is webhook
   if (data.updateStrategy === "webhook" && (session as any).accessToken) {
-    const publicUrl = process.env.NEXT_PUBLIC_APP_URL
-    if (publicUrl && !publicUrl.includes("localhost")) {
+    const headerList = await headers()
+    const host = headerList.get("host")
+    const proto = headerList.get("x-forwarded-proto") || "http"
+    const publicUrl = process.env.NEXT_PUBLIC_APP_URL || `${proto}://${host}`
+
+    if (publicUrl) {
         try {
             // Parse owner/repo from URL (e.g. https://github.com/owner/repo)
             const urlParts = data.repoUrl.replace("https://github.com/", "").split("/")

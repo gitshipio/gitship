@@ -4,6 +4,8 @@ import { RegistrySettings } from "@/components/registry-settings"
 import { GitHubAppSettings } from "@/components/github-app-settings"
 import { getGitHubInstallation } from "@/lib/github"
 import { redirect } from "next/navigation"
+import { resolveUserSession } from "@/lib/auth-utils"
+import { ensureGitshipUser } from "@/lib/namespace"
 
 export default async function SettingsPage() {
     const session = await auth()
@@ -11,11 +13,13 @@ export default async function SettingsPage() {
         redirect("/api/auth/signin")
     }
 
-    const username = (session.user as any).githubUsername || session.user.name || "unknown"
-    const sanitized = username.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/^-|-$/g, "")
+    const { username, githubId, internalId } = resolveUserSession(session)
+    
+    // Ensure user record exists
+    await ensureGitshipUser(username, parseInt(githubId))
     
     const [user, installation] = await Promise.all([
-        getGitshipUser(sanitized),
+        getGitshipUser(internalId),
         getGitHubInstallation()
     ])
 

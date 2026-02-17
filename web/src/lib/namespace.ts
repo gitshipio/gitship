@@ -2,38 +2,97 @@
 
 import { k8sCoreApi, k8sNetworkingApi, k8sCustomApi } from "./k8s"
 
+const SYSTEM_NAMESPACE = process.env.SYSTEM_NAMESPACE || "gitship-system"
+const QUOTA_PODS = process.env.QUOTA_PODS || "20"
+const QUOTA_CPU_REQ = process.env.QUOTA_CPU_REQ || "4"
+const QUOTA_MEM_REQ = process.env.QUOTA_MEM_REQ || "8Gi"
+const QUOTA_CPU_LIM = process.env.QUOTA_CPU_LIM || "8"
+const QUOTA_MEM_LIM = process.env.QUOTA_MEM_LIM || "16Gi"
+const QUOTA_STORAGE = process.env.QUOTA_STORAGE || "10Gi"
+
 /**
  * Ensure a GitshipUser CRD exists for the given user.
+ * Keyed by GitHub ID for permanence.
  */
 export async function ensureGitshipUser(username: string, githubID: number): Promise<string> {
-  const sanitized = username.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/^-|-$/g, "")
+  const resourceName = `u-${githubID}`
   
   try {
-    await k8sCustomApi.createClusterCustomObject({
-      group: "gitship.io",
-      version: "v1alpha1",
-      plural: "gitshipusers",
-      body: {
+    const existing: any = await k8sCustomApi.getClusterCustomObject({
+        group: "gitship.io",
+        version: "v1alpha1",
+        plural: "gitshipusers",
+        name: resourceName,
+    }).catch(() => null)
+
+    const body = {
         apiVersion: "gitship.io/v1alpha1",
         kind: "GitshipUser",
         metadata: {
-          name: sanitized,
+          name: resourceName,
+          labels: {
+            "gitship.io/github-username": username.toLowerCase()
+          }
         },
         spec: {
           githubUsername: username,
           githubID: githubID,
-          role: "restricted",
+          role: existing ? existing.spec.role : "restricted",
+          quotas: existing ? existing.spec.quotas : undefined,
+          registries: existing ? existing.spec.registries : undefined,
         },
-      },
-    })
-    console.log(`[user] Created GitshipUser: ${sanitized}`)
-  } catch (e: any) {
-    const code = e.body?.code || e.response?.statusCode
-    if (code !== 409) {
-      console.error(`[user] Failed to create GitshipUser ${sanitized}:`, e.body?.message || e.message)
     }
+
+    if (!existing) {
+        // Migration logic: Check if a legacy record (username-based) exists
+        const legacyName = username.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/^-|-$/g, "")
+        const legacy: any = await k8sCustomApi.getClusterCustomObject({
+            group: "gitship.io",
+            version: "v1alpha1",
+            plural: "gitshipusers",
+            name: legacyName,
+        }).catch(() => null)
+
+        // Migrate if ID matches OR if Username matches (for very old records)
+        if (legacy && (legacy.spec.githubID === githubID || legacy.spec.githubUsername?.toLowerCase() === username.toLowerCase())) {
+            console.log(`[user] Migrating legacy user ${legacyName} to ${resourceName}`)
+            body.spec.role = legacy.spec.role
+            body.spec.quotas = legacy.spec.quotas
+            body.spec.registries = legacy.spec.registries
+            
+            // Clean up legacy record
+            await k8sCustomApi.deleteClusterCustomObject({
+                group: "gitship.io",
+                version: "v1alpha1",
+                plural: "gitshipusers",
+                name: legacyName,
+            }).catch(e => console.warn(`[user] Failed to cleanup legacy user ${legacyName}:`, e.message))
+        }
+
+        await k8sCustomApi.createClusterCustomObject({
+            group: "gitship.io",
+            version: "v1alpha1",
+            plural: "gitshipusers",
+            body,
+        })
+        console.log(`[user] Created GitshipUser: ${resourceName} (@${username})`)
+    } else {
+        // Update username if it changed
+        if (existing.spec.githubUsername !== username) {
+            await k8sCustomApi.patchClusterCustomObject({
+                group: "gitship.io",
+                version: "v1alpha1",
+                plural: "gitshipusers",
+                name: resourceName,
+                body: { spec: { githubUsername: username } }
+            }, { headers: { "Content-Type": "application/merge-patch+json" } } as any)
+            console.log(`[user] Updated username for ${resourceName}: ${username}`)
+        }
+    }
+  } catch (e: any) {
+    console.error(`[user] Failed to ensure GitshipUser ${resourceName}:`, e.body?.message || e.message)
   }
-  return sanitized
+  return resourceName
 }
 
 /**
@@ -41,9 +100,8 @@ export async function ensureGitshipUser(username: string, githubID: number): Pro
  * Safe to call multiple times — uses try-create pattern (ignores 409 AlreadyExists).
  */
 export async function ensureUserNamespace(userId: string): Promise<string> {
-  // Sanitize: K8s namespace must be lowercase DNS label
-  const sanitized = userId.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/^-|-$/g, "")
-  const namespace = `gitship-user-${sanitized}`
+  // userId is now 'u-ID'
+  const namespace = `gitship-${userId}`
 
   try {
     await k8sCoreApi.createNamespace({
@@ -51,7 +109,7 @@ export async function ensureUserNamespace(userId: string): Promise<string> {
         metadata: {
           name: namespace,
           labels: {
-            "gitship.io/user": sanitized,
+            "gitship.io/user": userId,
             "gitship.io/managed": "true",
             "app.kubernetes.io/managed-by": "gitship",
           },
@@ -92,7 +150,7 @@ export async function ensureUserNamespace(userId: string): Promise<string> {
                 {
                   namespaceSelector: {
                     matchLabels: {
-                      "kubernetes.io/metadata.name": "gitship-system",
+                      "kubernetes.io/metadata.name": SYSTEM_NAMESPACE,
                     },
                   },
                 },
@@ -123,11 +181,12 @@ export async function ensureUserNamespace(userId: string): Promise<string> {
         },
         spec: {
           hard: {
-            pods: "20",
-            "requests.cpu": "4",
-            "requests.memory": "8Gi",
-            "limits.cpu": "8",
-            "limits.memory": "16Gi",
+            pods: QUOTA_PODS,
+            "requests.cpu": QUOTA_CPU_REQ,
+            "requests.memory": QUOTA_MEM_REQ,
+            "limits.cpu": QUOTA_CPU_LIM,
+            "limits.memory": QUOTA_MEM_LIM,
+            "requests.storage": QUOTA_STORAGE,
           },
         },
       },
@@ -184,9 +243,8 @@ export async function ensureGitHubSecret(namespace: string, token: string): Prom
 }
 
 /**
- * Resolve the namespace for the current user from their username.
+ * Resolve the namespace for the current user from their internal ID.
  */
-export function getUserNamespace(username: string): string {
-  const sanitized = username.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/^-|-$/g, "")
-  return `gitship-user-${sanitized}`
+export function getUserNamespace(userInternalId: string): string {
+  return `gitship-${userInternalId}`
 }

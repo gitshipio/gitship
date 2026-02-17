@@ -20,6 +20,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.accessToken = account.access_token
         // @ts-ignore login exists on github profile
         token.githubUsername = profile?.login?.toLowerCase()
+        // @ts-ignore id exists on github profile
+        token.githubId = profile?.id?.toString()
       }
       return token
     },
@@ -28,6 +30,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.accessToken = token.accessToken
       // @ts-expect-error githubUsername is not typed
       session.user.githubUsername = token.githubUsername
+      // @ts-expect-error githubId is not typed
+      session.user.githubId = token.githubId
       return session
     },
   },

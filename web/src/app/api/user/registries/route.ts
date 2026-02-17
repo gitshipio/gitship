@@ -3,6 +3,7 @@ import { auth } from "@/auth"
 import { getGitshipUser } from "@/lib/api"
 import * as k8s from "@kubernetes/client-node"
 import https from "https"
+import { resolveUserSession } from "@/lib/auth-utils"
 
 export async function POST(req: NextRequest) {
   const session = await auth()
@@ -10,12 +11,11 @@ export async function POST(req: NextRequest) {
 
   try {
     const registry = await req.json()
-    const rawUsername = (session.user as any).githubUsername || session.user.name || "unknown"
-    const username = rawUsername.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/^-|-$/g, "")
+    const { internalId } = resolveUserSession(session)
 
-    console.log(`[API] Updating registries for ${username}: ${registry.name}`)
+    console.log(`[API] Updating registries for ${internalId}: ${registry.name}`)
 
-    const user = await getGitshipUser(username)
+    const user = await getGitshipUser(internalId)
     if (!user) return NextResponse.json({ error: "User profile not found" }, { status: 404 })
 
     const registries = user.spec.registries || []
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     }
 
     const cluster = kc.getCurrentCluster()
-    const url = `${cluster?.server}/apis/gitship.io/v1alpha1/gitshipusers/${username}`
+    const url = `${cluster?.server}/apis/gitship.io/v1alpha1/gitshipusers/${internalId}`
     
     const opts: any = {
         method: 'PATCH',
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
         throw new Error(`K8s API Error: ${errorText}`)
     }
 
-    console.log(`[API] Successfully patched GitshipUser ${username}`)
+    console.log(`[API] Successfully patched GitshipUser ${internalId}`)
     return NextResponse.json({ ok: true })
   } catch (e: any) {
     console.error(`[API] Failed to add registry:`, e.message)
@@ -73,10 +73,9 @@ export async function DELETE(req: NextRequest) {
   
     try {
       const { name } = await req.json()
-      const rawUsername = (session.user as any).githubUsername || session.user.name || "unknown"
-      const username = rawUsername.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/^-|-$/g, "")
+      const { internalId } = resolveUserSession(session)
   
-      const user = await getGitshipUser(username)
+      const user = await getGitshipUser(internalId)
       if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 })
   
       const registries = user.spec.registries || []
@@ -85,7 +84,7 @@ export async function DELETE(req: NextRequest) {
       const kc = new k8s.KubeConfig()
       kc.loadFromDefault()
       const cluster = kc.getCurrentCluster()
-      const url = `${cluster?.server}/apis/gitship.io/v1alpha1/gitshipusers/${username}`
+      const url = `${cluster?.server}/apis/gitship.io/v1alpha1/gitshipusers/${internalId}`
       
       const patch = {
           spec: {

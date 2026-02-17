@@ -6,15 +6,15 @@ import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/auth"
 import { getGitshipUser } from "./api"
+import { resolveUserSession } from "./auth-utils"
 
 export async function getCurrentUserRole(): Promise<string> {
   const session = await auth()
   if (!session?.user) return "guest"
   
-  const username = (session.user as any).githubUsername || session.user.name || "unknown"
-  const sanitized = username.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/^-|-$/g, "")
+  const { internalId } = resolveUserSession(session)
   
-  const user = await getGitshipUser(sanitized)
+  const user = await getGitshipUser(internalId)
   return user?.spec.role || "user"
 }
 

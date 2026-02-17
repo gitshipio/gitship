@@ -1,8 +1,9 @@
 import { auth } from "@/auth"
 import { getGitshipUsers, getGitshipApps, getClusterNodes, getStorageClasses } from "@/lib/api"
-import { isAdmin as checkAdmin } from "@/lib/auth-utils"
+import { isAdmin as checkAdmin, resolveUserSession } from "@/lib/auth-utils"
 import { redirect } from "next/navigation"
 import { AdminDashboardUI } from "@/components/admin-dashboard"
+import { ensureGitshipUser } from "@/lib/namespace"
 
 export default async function AdminPage() {
     const session = await auth()
@@ -10,9 +11,12 @@ export default async function AdminPage() {
         redirect("/api/auth/signin")
     }
 
-    const username = (session.user as any).githubUsername || session.user.name || "unknown"
+    const { username, githubId, internalId } = resolveUserSession(session)
     
-    const isUserAdmin = await checkAdmin(username)
+    // Ensure user record exists (triggers migration for legacy admins)
+    await ensureGitshipUser(username, parseInt(githubId))
+    
+    const isUserAdmin = await checkAdmin(internalId)
     
     // Strict Role Check
     if (!isUserAdmin) {

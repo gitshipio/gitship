@@ -1,6 +1,7 @@
 import { auth } from "@/auth"
 import { kc } from "@/lib/k8s"
 import * as k8s from "@kubernetes/client-node"
+import { resolveUserSession } from "@/lib/auth-utils"
 
 export const dynamic = "force-dynamic"
 
@@ -8,11 +9,8 @@ export async function GET(req: Request) {
   const session = await auth()
   if (!session) return new Response("Unauthorized", { status: 401 })
 
-  const user = session.user?.name || session.user?.email
-  if (!user) return new Response("User not found", { status: 400 })
-
-  const sanitized = user.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/^-|-$/g, "")
-  const namespace = `gitship-user-${sanitized}`
+  const { username, internalId } = resolveUserSession(session)
+  const namespace = `gitship-${internalId}`
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -30,7 +28,7 @@ export async function GET(req: Request) {
 
       const watchPath = `/apis/gitship.io/v1alpha1/namespaces/${namespace}/gitshipapps`
       
-      console.log(`[SSE] Starting watch for ${user} in ${namespace}...`)
+      console.log(`[SSE] Starting watch for ${username} in ${namespace}...`)
 
       try {
         const watchReq = await watch.watch(
@@ -58,7 +56,7 @@ export async function GET(req: Request) {
 
         // Abort controller for cleanup
         req.signal.addEventListener('abort', () => {
-            console.log(`[SSE] Request aborted for ${user}`)
+            console.log(`[SSE] Request aborted for ${username}`)
             clearInterval(keepAlive)
             try { watchReq.abort() } catch {}
         })
@@ -70,7 +68,7 @@ export async function GET(req: Request) {
       }
     },
     cancel() {
-      console.log(`[SSE] Stream cancelled for ${user}`)
+      console.log(`[SSE] Stream cancelled for ${username}`)
     }
   })
 
