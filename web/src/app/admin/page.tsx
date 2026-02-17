@@ -1,5 +1,5 @@
 import { auth } from "@/auth"
-import { getGitshipUsers, getGitshipApps, getClusterNodes, getStorageClasses } from "@/lib/api"
+import { getGitshipUsers, getGitshipAppsAdmin, getClusterNodes, getStorageClasses } from "@/lib/api"
 import { isAdmin as checkAdmin, resolveUserSession } from "@/lib/auth-utils"
 import { redirect } from "next/navigation"
 import { AdminDashboardUI } from "@/components/admin-dashboard"
@@ -25,7 +25,7 @@ export default async function AdminPage() {
 
     const [users, apps, nodes, storageClasses] = await Promise.all([
         getGitshipUsers(),
-        getGitshipApps(), // ALL namespaces
+        getGitshipAppsAdmin(), // Use explicit admin function
         getClusterNodes(),
         getStorageClasses()
     ])

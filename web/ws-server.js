@@ -3,8 +3,10 @@ const k8s = require("@kubernetes/client-node")
 const { Stream } = require("stream")
 const { parse } = require("url")
 const { createServer } = require("http")
+const { jwtVerify } = require("jose")
 
 const PORT = process.env.WS_PORT || 3001
+const SECRET = new TextEncoder().encode(process.env.AUTH_SECRET || "dummy-secret-do-not-use-in-prod")
 
 console.log(`[WS Server] Starting on port ${PORT}...`)
 
@@ -16,28 +18,43 @@ const server = createServer((req, res) => {
 const wss = new WebSocketServer({ noServer: true })
 
 server.on("upgrade", (req, socket, head) => {
-    const { pathname, query } = parse(req.url, true)
+    const { pathname } = parse(req.url, true)
 
     // Match /api/console or just / since rewritten
     if (pathname === "/api/console" || pathname === "/") {
         wss.handleUpgrade(req, socket, head, (ws) => {
-            wss.emit("connection", ws, req, query)
+            wss.emit("connection", ws, req)
         })
     } else {
         socket.destroy()
     }
 })
 
-wss.on("connection", async (ws, req, query) => {
-    const { namespace, name, container } = query
+wss.on("connection", async (ws, req) => {
+    const { query } = parse(req.url, true)
+    const token = query.token
 
-    if (!namespace || !name) {
-        ws.send("Error: namespace and pod name required\r\n")
+    if (!token) {
+        ws.send("Error: Authorization token required\r\n")
         ws.close()
         return
     }
 
-    console.log(`[Console] Connecting to ${namespace}/${name}`)
+    let payload
+    try {
+        const verified = await jwtVerify(token, SECRET)
+        payload = verified.payload
+    } catch (e) {
+        console.error("Token verification failed:", e.message)
+        ws.send("Error: Invalid or expired token\r\n")
+        ws.close()
+        return
+    }
+
+    const { namespace, podName } = payload
+    const container = query.container
+
+    console.log(`[Console] Connecting to ${namespace}/${podName} (Authorized)`)
 
     try {
         const kc = new k8s.KubeConfig()
@@ -62,8 +79,8 @@ wss.on("connection", async (ws, req, query) => {
 
         realExec.exec(
             namespace,
-            name,
-            container ?? name,
+            podName,
+            container ?? "app", // Default to 'app' container
             ['/bin/sh', '-c', 'TERM=xterm-256color /bin/sh'],
             wsOutputStream,
             wsOutputStream,

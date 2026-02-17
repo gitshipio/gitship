@@ -55,37 +55,31 @@ export async function getClusterNodes() {
     }
 }
 
-export async function getGitshipApps(namespace: string = ""): Promise<GitshipAppList> {
+export async function getGitshipApps(namespace: string): Promise<GitshipAppList> {
   try {
-    console.log(`[API] getGitshipApps called. Namespace: '${namespace || "ALL"}'`)
-    let response: any;
-    if (namespace) {
-      // Scoped to user namespace
-      response = await k8sCustomApi.listNamespacedCustomObject({
-        group: "gitship.io",
-        version: "v1alpha1",
-        namespace,
-        plural: "gitshipapps",
-      });
-    } else {
-      // List all (admin/fallback)
-      response = await k8sCustomApi.listClusterCustomObject({
-        group: "gitship.io",
-        version: "v1alpha1",
-        plural: "gitshipapps",
-      });
+    console.log(`[API] getGitshipApps called. Namespace: '${namespace}'`)
+    if (!namespace) {
+        console.warn("[API] getGitshipApps called without namespace. Returning empty list for security.")
+        return { apiVersion: "gitship.io/v1alpha1", kind: "GitshipAppList", metadata: { resourceVersion: "0" }, items: [] }
     }
+
+    // Scoped to user namespace
+    const response: any = await k8sCustomApi.listNamespacedCustomObject({
+      group: "gitship.io",
+      version: "v1alpha1",
+      namespace,
+      plural: "gitshipapps",
+    });
     
     // Handle both response formats
     const data = response?.body ?? response;
     const items = (data as any)?.items || [];
     
-    console.log(`[API] getGitshipApps success. Items found: ${items.length}. Response keys: ${Object.keys(data || {}).join(",")}`)
+    console.log(`[API] getGitshipApps success. Items found: ${items.length}.`)
     
     return data as GitshipAppList;
   } catch (error: any) {
     console.error("[API] Failed to fetch GitshipApps:", error.body?.message || error.message);
-    if (error.body) console.error("[API] Error body:", JSON.stringify(error.body));
     
     return {
       apiVersion: "gitship.io/v1alpha1",
@@ -94,6 +88,22 @@ export async function getGitshipApps(namespace: string = ""): Promise<GitshipApp
       items: [],
     };
   }
+}
+
+export async function getGitshipAppsAdmin(): Promise<GitshipAppList> {
+    try {
+        console.log(`[API] getGitshipAppsAdmin called.`)
+        const response: any = await k8sCustomApi.listClusterCustomObject({
+            group: "gitship.io",
+            version: "v1alpha1",
+            plural: "gitshipapps",
+        });
+        const data = response?.body ?? response;
+        return data as GitshipAppList;
+    } catch (error: any) {
+        console.error("[API] Failed to fetch all GitshipApps (Admin):", error.message);
+        return { items: [] } as any;
+    }
 }
 
 export async function getGitshipApp(name: string, namespace: string = "default"): Promise<GitshipApp | null> {
