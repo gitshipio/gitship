@@ -60,7 +60,6 @@ export interface GitshipAppSpec {
   ingressPort?: number;
   volumes?: VolumeConfig[];
   secretMounts?: SecretMountConfig[];
-  addons?: AddonConfig[];
   updateStrategy?: {
     type: "polling" | "webhook";
     interval?: string;
@@ -147,4 +146,31 @@ export interface GitshipAppList {
     resourceVersion: string;
   };
   items: GitshipApp[];
+}
+
+export interface GitshipIntegration {
+    apiVersion: "gitship.io/v1alpha1";
+    kind: "GitshipIntegration";
+    metadata: {
+        name: string;
+        namespace: string;
+        creationTimestamp?: string;
+        uid?: string;
+    };
+    spec: {
+        type: string;
+        config?: Record<string, string>;
+        resources?: {
+            cpu?: string;
+            memory?: string;
+        };
+        replicas?: number;
+        enabled?: boolean;
+    };
+    status?: {
+        phase?: string;
+        message?: string;
+        readyReplicas?: number;
+        desiredReplicas?: number;
+    };
 }

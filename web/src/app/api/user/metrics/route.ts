@@ -34,7 +34,7 @@ export async function GET() {
   
   try {
     const metricsClient = new k8s.Metrics(kc)
-    const [quotaResponse, gitshipAppsResponse, pvcResponse]: any = await Promise.all([
+    const [quotaResponse, gitshipAppsResponse, gitshipIntegrationsResponse, pvcResponse]: any = await Promise.all([
         k8sCoreApi.readNamespacedResourceQuota({ name: "user-quota", namespace }).catch(() => null),
         k8sCustomApi.listNamespacedCustomObject({
             group: "gitship.io",
@@ -42,11 +42,19 @@ export async function GET() {
             namespace,
             plural: "gitshipapps",
         }),
+        k8sCustomApi.listNamespacedCustomObject({
+            group: "gitship.io",
+            version: "v1alpha1",
+            namespace,
+            plural: "gitshipintegrations",
+        }).catch(() => ({ body: { items: [] } })),
         k8sCoreApi.listNamespacedPersistentVolumeClaim({ namespace }).catch(() => ({ body: { items: [] } }))
     ])
     
     const gitshipApps = gitshipAppsResponse?.body || gitshipAppsResponse
     const appsItems = gitshipApps?.items || []
+    const gitshipIntegrations = gitshipIntegrationsResponse?.body || gitshipIntegrationsResponse
+    const integrationItems = gitshipIntegrations?.items || []
     const quota = quotaResponse?.body || quotaResponse
     const pvcs = pvcResponse?.body?.items || pvcResponse?.items || []
 
@@ -55,6 +63,7 @@ export async function GET() {
     appsItems.forEach((app: any) => {
         appsMap[app.metadata.name] = {
             name: app.metadata.name,
+            type: "app",
             namespace: app.metadata.namespace,
             cpuLimit: app.spec.resources?.cpu || "500m",
             memoryLimit: app.spec.resources?.memory || "1Gi",
@@ -62,7 +71,27 @@ export async function GET() {
             cpuUsage: 0,
             memoryUsage: 0,
             storageUsage: 0,
-            podCount: 0
+            podCount: 0,
+            replicas: app.spec.replicas || 1
+        }
+    })
+
+    // 1b. Map Integrations
+    integrationItems.forEach((int: any) => {
+        const name = `gitship-integration-${int.metadata.name}`
+        appsMap[name] = {
+            name: int.metadata.name,
+            fullName: name,
+            type: "integration",
+            namespace: int.metadata.namespace,
+            cpuLimit: int.spec.resources?.cpu || "100m",
+            memoryLimit: int.spec.resources?.memory || "128Mi",
+            storageLimit: "0",
+            cpuUsage: 0,
+            memoryUsage: 0,
+            storageUsage: 0,
+            podCount: 0,
+            replicas: int.spec.replicas ?? (int.spec.enabled ? 1 : 0)
         }
     })
 
@@ -87,8 +116,12 @@ export async function GET() {
         totalPods = podMetrics.items.length
 
         podMetrics.items.forEach((pod: any) => {
+            // Apps use 'app' label, Integrations use 'gitship.io/integration'
             const appName = pod.metadata.labels?.app
-            const app = appName ? appsMap[appName] : null
+            const intName = pod.metadata.labels?.["gitship.io/integration"]
+            
+            const targetName = appName || (intName ? `gitship-integration-${intName}` : null)
+            const entry = targetName ? appsMap[targetName] : null
             
             pod.containers.forEach((container: any) => {
                 const cpu = parseCpu(container.usage.cpu)
@@ -97,12 +130,12 @@ export async function GET() {
                 totalCpu += cpu
                 totalMemory += mem
                 
-                if (app) {
-                    app.cpuUsage += cpu
-                    app.memoryUsage += mem
+                if (entry) {
+                    entry.cpuUsage += cpu
+                    entry.memoryUsage += mem
                 }
             })
-            if (app) app.podCount++
+            if (entry) entry.podCount++
         })
     } catch (me: any) {
         console.warn(`[METRICS] Could not fetch pod metrics: ${me.message}. This is normal if metrics-server is starting or missing.`)
@@ -119,8 +152,8 @@ export async function GET() {
     
     return NextResponse.json({
         total: {
-            cpuUsage: totalCpu + "m",
-            cpuLimit: hard["limits.cpu"] || hard["cpu"] || "0",
+            cpuUsage: totalCpu,
+            cpuLimit: parseCpu(hard["limits.cpu"] || hard["cpu"] || "0"),
             memoryUsage: totalMemory,
             memoryLimit: parseMemory(hard["limits.memory"] || hard["memory"] || "0"),
             podCount: totalPods,

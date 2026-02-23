@@ -1,5 +1,5 @@
 import { k8sCustomApi, k8sAppsApi, k8sCoreApi, k8sNetworkingApi } from "./k8s";
-import { GitshipAppList, GitshipApp, GitshipUser } from "./types";
+import { GitshipAppList, GitshipApp, GitshipUser, GitshipIntegration } from "./types";
 import * as k8s from '@kubernetes/client-node';
 
 export async function getGitshipUser(username: string): Promise<GitshipUser | null> {
@@ -176,6 +176,39 @@ export async function getUserQuotas(username: string) {
     } catch (err: any) {
         console.error(`[QUOTA] Failed to fetch quota for ${namespace}:`, err.body?.message || err.message)
         return null
+    }
+}
+
+export async function getGitshipIntegrations(namespace: string): Promise<GitshipIntegration[]> {
+    try {
+        console.log(`[API] getGitshipIntegrations called. Namespace: '${namespace}'`)
+        const response: any = await k8sCustomApi.listNamespacedCustomObject({
+            group: "gitship.io",
+            version: "v1alpha1",
+            namespace,
+            plural: "gitshipintegrations",
+        });
+        const data = response?.body ?? response;
+        return (data.items || []) as GitshipIntegration[];
+    } catch (error: any) {
+        console.error(`[API] Failed to fetch integrations for ${namespace}:`, error.message);
+        return [];
+    }
+}
+
+export async function getGitshipIntegrationsAdmin(): Promise<GitshipIntegration[]> {
+    try {
+        console.log(`[API] getGitshipIntegrationsAdmin called.`)
+        const response: any = await k8sCustomApi.listClusterCustomObject({
+            group: "gitship.io",
+            version: "v1alpha1",
+            plural: "gitshipintegrations",
+        });
+        const data = response?.body ?? response;
+        return (data.items || []) as GitshipIntegration[];
+    } catch (error: any) {
+        console.error("[API] Failed to fetch all GitshipIntegrations (Admin):", error.message);
+        return [];
     }
 }
 

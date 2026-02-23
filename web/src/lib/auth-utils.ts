@@ -8,9 +8,10 @@ export function resolveUserSession(session: any) {
     
     const githubId = session.user.githubId || session.user.id || "0"
     const username = session.user.githubUsername || session.user.name || "unknown"
+    const email = session.user.email || ""
     const internalId = `u-${githubId}`
     
-    return { githubId, username, internalId }
+    return { githubId, username, internalId, email }
 }
 
 export async function isAdmin(internalId: string): Promise<boolean> {

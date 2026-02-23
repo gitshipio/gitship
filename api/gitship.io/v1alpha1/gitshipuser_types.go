@@ -27,8 +27,8 @@ import (
 type GitshipUserSpec struct {
 	GitHubUsername string `json:"githubUsername"`
 	GitHubID       int64  `json:"githubID"`
-	// List of custom namespace suffixes (e.g. "staging" -> "gitship-user-simon-staging")
-	CustomSpaces []string `json:"customSpaces,omitempty"`
+	// Email for Let's Encrypt notifications and Issuer registration
+	Email string `json:"email,omitempty"`
 
 	// Saved registries for this user
 	Registries []RegistryConfig `json:"registries,omitempty"`

@@ -14,7 +14,7 @@ const QUOTA_STORAGE = process.env.QUOTA_STORAGE || "10Gi"
  * Ensure a GitshipUser CRD exists for the given user.
  * Keyed by GitHub ID for permanence.
  */
-export async function ensureGitshipUser(username: string, githubID: number): Promise<string> {
+export async function ensureGitshipUser(username: string, githubID: number, email: string = ""): Promise<string> {
   const resourceName = `u-${githubID}`
   
   try {
@@ -37,6 +37,7 @@ export async function ensureGitshipUser(username: string, githubID: number): Pro
         spec: {
           githubUsername: username,
           githubID: githubID,
+          email: email,
           role: existing ? existing.spec.role : "restricted",
           quotas: existing ? existing.spec.quotas : undefined,
           registries: existing ? existing.spec.registries : undefined,

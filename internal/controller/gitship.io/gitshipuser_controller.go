@@ -18,11 +18,12 @@ package gitshipio
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"strings"
 
+	acmev1 "github.com/cert-manager/cert-manager/pkg/apis/acme/v1"
+	cmv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -49,6 +50,7 @@ type GitshipUserReconciler struct {
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=resourcequotas,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=cert-manager.io,resources=issuers,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -63,63 +65,59 @@ func (r *GitshipUserReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	log.Info("Reconciling GitshipUser", "user", gitshipUser.Spec.GitHubUsername, "id", gitshipUser.Name)
 
-	expectedNamespaces := []string{}
 	// Use the metadata name (u-ID) as the base for the namespace
-	baseNamespace := "gitship-" + gitshipUser.Name
-	expectedNamespaces = append(expectedNamespaces, baseNamespace)
+	nsName := "gitship-" + gitshipUser.Name
 
-	for _, suffix := range gitshipUser.Spec.CustomSpaces {
-		expectedNamespaces = append(expectedNamespaces, baseNamespace+"-"+suffix)
+	ns := &corev1.Namespace{}
+	err := r.Get(ctx, client.ObjectKey{Name: nsName}, ns)
+	if err != nil && client.IgnoreNotFound(err) != nil {
+		log.Error(err, "Failed to get Namespace", "namespace", nsName)
+		return ctrl.Result{}, err
 	}
 
-	createdNamespaces := []string{}
-	for _, nsName := range expectedNamespaces {
-		ns := &corev1.Namespace{}
-		err := r.Get(ctx, client.ObjectKey{Name: nsName}, ns)
-		if err != nil && client.IgnoreNotFound(err) != nil {
-			log.Error(err, "Failed to get Namespace", "namespace", nsName)
+	if err != nil {
+		log.Info("Creating Namespace", "namespace", nsName)
+		newNs := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: nsName,
+				Labels: map[string]string{
+					"app.kubernetes.io/managed-by": "gitship-controller",
+					"gitship.io/user":              gitshipUser.Name,
+					"gitship.io/github-username":   strings.ToLower(gitshipUser.Spec.GitHubUsername),
+				},
+			},
+		}
+		if err := r.Create(ctx, newNs); err != nil {
+			log.Error(err, "Failed to create Namespace", "namespace", nsName)
 			return ctrl.Result{}, err
 		}
+	}
 
-		if err != nil {
-			log.Info("Creating Namespace", "namespace", nsName)
-			newNs := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: nsName,
-					Labels: map[string]string{
-						"app.kubernetes.io/managed-by": "gitship-controller",
-						"gitship.io/user":              gitshipUser.Name,
-						"gitship.io/github-username":   strings.ToLower(gitshipUser.Spec.GitHubUsername),
-					},
-				},
-			}
-			if err := r.Create(ctx, newNs); err != nil {
-				log.Error(err, "Failed to create Namespace", "namespace", nsName)
-				return ctrl.Result{}, err
-			}
+	for _, reg := range gitshipUser.Spec.Registries {
+		if err := r.ensureRegistrySecret(ctx, nsName, reg); err != nil {
+			log.Error(err, "Failed to sync registry secret", "namespace", nsName, "registry", reg.Name)
 		}
+	}
 
-		for _, reg := range gitshipUser.Spec.Registries {
-			if err := r.ensureRegistrySecret(ctx, nsName, reg); err != nil {
-				log.Error(err, "Failed to sync registry secret", "namespace", nsName, "registry", reg.Name)
-			}
+	// Ensure ResourceQuotas exist
+	if err := r.ensureResourceQuota(ctx, nsName, gitshipUser.Spec.Quotas); err != nil {
+		log.Error(err, "Failed to sync resource quota", "namespace", nsName)
+	}
+
+	// Ensure NetworkPolicy exists
+	if err := r.ensureNetworkPolicy(ctx, nsName); err != nil {
+		log.Error(err, "Failed to sync network policy", "namespace", nsName)
+	}
+
+	// Ensure Cert-Manager Issuer exists if email is provided
+	if gitshipUser.Spec.Email != "" {
+		if err := r.ensureIssuer(ctx, nsName, gitshipUser.Spec.Email); err != nil {
+			log.Error(err, "Failed to sync issuer", "namespace", nsName)
 		}
-
-		// Ensure ResourceQuotas exist
-		if err := r.ensureResourceQuota(ctx, nsName, gitshipUser.Spec.Quotas); err != nil {
-			log.Error(err, "Failed to sync resource quota", "namespace", nsName)
-		}
-
-		// Ensure NetworkPolicy exists
-		if err := r.ensureNetworkPolicy(ctx, nsName); err != nil {
-			log.Error(err, "Failed to sync network policy", "namespace", nsName)
-		}
-
-		createdNamespaces = append(createdNamespaces, nsName)
 	}
 
 	gitshipUser.Status.Ready = true
-	gitshipUser.Status.Namespaces = createdNamespaces
+	gitshipUser.Status.Namespaces = []string{nsName}
 	if err := r.Status().Update(ctx, gitshipUser); err != nil {
 		log.Error(err, "Failed to update GitshipUser status")
 		return ctrl.Result{}, err
@@ -303,18 +301,60 @@ func (r *GitshipUserReconciler) ensureNetworkPolicy(ctx context.Context, namespa
 	return r.Create(ctx, newPolicy)
 }
 
-func createDockerConfigJSON(server, username, password string) ([]byte, error) {
-	auth := base64.StdEncoding.EncodeToString([]byte(username + ":" + password))
-	config := map[string]interface{}{
-		"auths": map[string]interface{}{
-			server: map[string]interface{}{
-				"username": username,
-				"password": password,
-				"auth":     auth,
+func (r *GitshipUserReconciler) ensureIssuer(ctx context.Context, namespace string, email string) error {
+	issuerName := "letsencrypt-prod"
+	issuer := &cmv1.Issuer{}
+	err := r.Get(ctx, client.ObjectKey{Namespace: namespace, Name: issuerName}, issuer)
+
+	if err != nil && client.IgnoreNotFound(err) != nil {
+		return err
+	}
+
+	spec := cmv1.IssuerSpec{
+		IssuerConfig: cmv1.IssuerConfig{
+			ACME: &acmev1.ACMEIssuer{
+				Server: "https://acme-v02.api.letsencrypt.org/directory",
+				Email:  email,
+				PrivateKey: cmmeta.SecretKeySelector{
+					LocalObjectReference: cmmeta.LocalObjectReference{
+						Name: "letsencrypt-prod-account-key",
+					},
+				},
+				Solvers: []acmev1.ACMEChallengeSolver{
+					{
+						HTTP01: &acmev1.ACMEChallengeSolverHTTP01{
+							Ingress: &acmev1.ACMEChallengeSolverHTTP01Ingress{
+								Class: &r.Config.IngressClassName,
+							},
+						},
+					},
+				},
 			},
 		},
 	}
-	return json.Marshal(config)
+
+	if err != nil {
+		// Create
+		newIssuer := &cmv1.Issuer{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      issuerName,
+				Namespace: namespace,
+				Labels: map[string]string{
+					"gitship.io/managed-by": "gitship-user-controller",
+				},
+			},
+			Spec: spec,
+		}
+		return r.Create(ctx, newIssuer)
+	}
+
+	// Update if email changed (simple check)
+	if issuer.Spec.ACME.Email != email {
+		issuer.Spec = spec
+		return r.Update(ctx, issuer)
+	}
+
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

@@ -52,7 +52,7 @@ export async function POST(
       plural: "gitshipapps",
       name,
       body: patch,
-    })
+    }, { headers: { "Content-Type": "application/json-patch+json" } } as any)
 
     return NextResponse.json({ ok: true })
   } catch (e: any) {

@@ -69,7 +69,7 @@ export async function bindSecretToApp(namespace: string, appName: string, secret
             plural: "gitshipapps",
             name: appName
         })
-        const app = res.body as GitshipApp
+        const app = (res.body || res) as GitshipApp
         const refs = app.spec.secretRefs || []
         
         if (!refs.includes(secretName)) {
@@ -99,7 +99,7 @@ export async function unbindSecretFromApp(namespace: string, appName: string, se
             plural: "gitshipapps",
             name: appName
         })
-        const app = res.body as GitshipApp
+        const app = (res.body || res) as GitshipApp
         const refs = app.spec.secretRefs || []
         
         const newRefs = refs.filter(r => r !== secretName)

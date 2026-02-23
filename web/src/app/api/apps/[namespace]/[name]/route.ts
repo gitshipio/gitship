@@ -19,19 +19,27 @@ export async function PATCH(
     const patchData = await req.json()
     console.log(`[API] PATCH GitshipApp ${name} in ${namespace}:`, JSON.stringify(patchData))
 
-    // Create individual patch operations for each field in spec
-    // This avoids overwriting the entire spec and losing required fields like repoUrl
+    // Create a JSON Patch array
     const patch: any[] = []
     
     if (patchData.spec) {
-      for (const [key, value] of Object.entries(patchData.spec)) {
+      if (patchData.spec.resources) {
         patch.push({
-          op: "add", // 'add' is safer as it works even if the path doesn't exist yet
-          path: `/spec/${key}`,
-          value: value,
+          op: "replace",
+          path: "/spec/resources",
+          value: patchData.spec.resources,
+        })
+      }
+      if (patchData.spec.replicas !== undefined) {
+        patch.push({
+          op: "replace",
+          path: "/spec/replicas",
+          value: patchData.spec.replicas,
         })
       }
     }
+
+    if (patch.length === 0) return NextResponse.json({ ok: true })
 
     await k8sCustomApi.patchNamespacedCustomObject({
       group: "gitship.io",
@@ -40,8 +48,9 @@ export async function PATCH(
       plural: "gitshipapps",
       name,
       body: patch,
-    })
+    }, { headers: { "Content-Type": "application/json-patch+json" } } as any)
 
+    console.log(`[API] SUCCESS: Patched GitshipApp ${name} in ${namespace}`)
     return NextResponse.json({ ok: true })
   } catch (e: any) {
     console.error("Failed to patch app:", e.body?.message || e.message)
