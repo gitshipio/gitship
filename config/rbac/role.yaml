@@ -46,9 +46,22 @@ rules:
   - update
   - watch
 - apiGroups:
+  - cert-manager.io
+  resources:
+  - issuers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - gitship.io
   resources:
   - gitshipapps
+  - gitshipintegrations
   - gitshipusers
   - users
   verbs:
@@ -63,6 +76,7 @@ rules:
   - gitship.io
   resources:
   - gitshipapps/finalizers
+  - gitshipintegrations/finalizers
   - gitshipusers/finalizers
   - users/finalizers
   verbs:
@@ -71,6 +85,7 @@ rules:
   - gitship.io
   resources:
   - gitshipapps/status
+  - gitshipintegrations/status
   - gitshipusers/status
   - users/status
   verbs:

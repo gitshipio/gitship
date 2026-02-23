@@ -18,19 +18,21 @@ import {
     Settings2, 
     Activity,
     ExternalLink,
-    Save
+    Save,
+    Blocks
 } from "lucide-react"
 import Link from "next/link"
-import { GitshipUser, GitshipApp } from "@/lib/types"
+import { GitshipUser, GitshipApp, GitshipIntegration } from "@/lib/types"
 import { ResourceUsage } from "@/components/resource-usage"
 
 interface UserAdminDetailProps {
     user: GitshipUser
     apps: GitshipApp[]
+    integrations: GitshipIntegration[]
     quotas: any
 }
 
-export function UserAdminDetailUI({ user, apps, quotas }: UserAdminDetailProps) {
+export function UserAdminDetailUI({ user, apps, integrations, quotas }: UserAdminDetailProps) {
     const router = useRouter()
     const [loading, setLoading] = useState(false)
 
@@ -264,6 +266,41 @@ export function UserAdminDetailUI({ user, apps, quotas }: UserAdminDetailProps) 
                                                 </Link>
                                             </Button>
                                         </div>
+                                    </div>
+                                </Card>
+                            ))
+                        )}
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-2xl font-bold flex items-center gap-2">
+                            <Blocks className="w-6 h-6 text-primary" />
+                            User Integrations ({integrations.length})
+                        </h2>
+                    </div>
+
+                    <div className="grid gap-4">
+                        {integrations.length === 0 ? (
+                            <div className="p-12 border-2 border-dashed rounded-2xl text-center text-muted-foreground">
+                                No active integrations for this user.
+                            </div>
+                        ) : (
+                            integrations.map(int => (
+                                <Card key={int.metadata.uid} className="overflow-hidden hover:border-primary/50 transition-colors">
+                                    <div className="flex items-center p-6 gap-6">
+                                        <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center shrink-0">
+                                            <Blocks className="w-6 h-6 text-muted-foreground" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="font-bold text-lg truncate">{int.metadata.name}</h3>
+                                                <Badge variant="outline" className="text-[10px] uppercase">{int.spec.type}</Badge>
+                                            </div>
+                                            <p className="text-sm text-muted-foreground truncate">{int.status?.message || "Active"}</p>
+                                        </div>
+                                        <Badge variant={int.status?.phase === "Ready" ? "default" : "secondary"}>
+                                            {int.status?.phase || "Unknown"}
+                                        </Badge>
                                     </div>
                                 </Card>
                             ))

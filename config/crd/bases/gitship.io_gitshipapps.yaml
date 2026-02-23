@@ -39,25 +39,6 @@ spec:
           spec:
             description: GitshipAppSpec defines the desired state of GitshipApp.
             properties:
-              addons:
-                description: Addons (Managed Databases, etc)
-                items:
-                  properties:
-                    name:
-                      description: Name of the addon instance
-                      type: string
-                    size:
-                      default: small
-                      description: Size of the addon instance (e.g. "small", "medium")
-                      type: string
-                    type:
-                      description: Type of addon (e.g. "postgres", "redis")
-                      type: string
-                  required:
-                  - name
-                  - type
-                  type: object
-                type: array
               authMethod:
                 default: token
                 description: 'Authentication method: "ssh" or "token"'
@@ -154,6 +135,10 @@ spec:
                     default: 1Gi
                     description: Memory limit (e.g. "512Mi", "1Gi")
                     type: string
+                  storage:
+                    default: 1Gi
+                    description: Storage limit (e.g. "1Gi", "10Gi")
+                    type: string
                 type: object
               secretMounts:
                 description: List of Secrets to mount as files
@@ -194,11 +179,6 @@ spec:
                 type: object
               tls:
                 description: TLS Configuration
-                properties:
-                  issuer:
-                    description: 'Optional: Custom ClusterIssuer name (defaults to
-                      "letsencrypt-prod" if empty)'
-                    type: string
                 type: object
               updateStrategy:
                 default:

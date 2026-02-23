@@ -8,12 +8,12 @@ image:
   repository: gitshipio/gitship-controller
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "latest"
+  # tag: ""
 
 dashboard:
   image:
     repository: gitshipio/gitship-dashboard
-    tag: "latest"
+    # tag: "latest"
   service:
     type: ClusterIP
     port: 3000
@@ -38,7 +38,6 @@ controller:
     registryPushUrl: "" # Defaults to internal service
     registryPullUrl: "" # Defaults to RegistryPushUrl
     systemNamespace: "gitship-system"
-    clusterIssuer: "letsencrypt-prod"
     ingressClassName: "nginx"
     defaultStorageClass: "" # Used for App PVCs if not specified
     images:

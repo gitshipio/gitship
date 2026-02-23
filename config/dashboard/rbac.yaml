@@ -1,15 +1,15 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: gitship-dashboard
+  name: dashboard
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: gitship-dashboard-reader
+  name: dashboard-reader
 rules:
   - apiGroups: ["gitship.io"]
-    resources: ["gitshipapps", "gitshipusers"]
+    resources: ["gitshipapps", "gitshipusers", "gitshipintegrations"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: [""]
     resources: ["namespaces", "nodes", "persistentvolumeclaims", "secrets", "services", "pods", "pods/log", "events", "resourcequotas"]
@@ -33,11 +33,12 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: gitship-dashboard-reader-binding
+  name: dashboard-reader-binding
 subjects:
   - kind: ServiceAccount
-    name: gitship-dashboard
+    name: dashboard
+    namespace: gitship-system
 roleRef:
   kind: ClusterRole
-  name: gitship-dashboard-reader
+  name: dashboard-reader
   apiGroup: rbac.authorization.k8s.io

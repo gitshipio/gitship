@@ -8,10 +8,11 @@
 ## Features
 
 - **Zero-Config Builds**: Automatically detects Node.js, Python, or Go projects and builds them using Kaniko.
-- **Live Stats Dashboard**: Real-time monitoring of CPU, RAM, and pod instances.
+- **Live Stats Dashboard**: Real-time monitoring of CPU, RAM, and storage usage.
+- **Standalone Integrations**: Support for external services like Cloudflare Tunnel for ingress-less exposure.
 - **SSH & Private Repos**: Seamless integration with GitHub via SSH deploy keys.
-- **Managed Networking**: Automatic management of Services and Ingresses.
-- **User Isolation**: Automatic provisioning of secure namespaces for every user.
+- **Personalized SSL**: Automated HTTPS certificates using per-user Let's Encrypt Issuers.
+- **User Isolation**: Automatic provisioning of secure, ID-based namespaces (`gitship-u-{ID}`) for every user.
 
 ## Installation
 
@@ -59,7 +60,7 @@ apiVersion: gitship.io/v1alpha1
 kind: GitshipApp
 metadata:
   name: my-app
-  namespace: gitship-user-username
+  namespace: gitship-u-12345678  # Use your GitHub ID
 spec:
   repoUrl: "https://github.com/username/repository"
   source:

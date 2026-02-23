@@ -1,7 +1,7 @@
 # This rule is not used by the project gitship itself.
 # It is provided to allow the cluster admin to help manage permissions for users.
 #
-# Grants full permissions ('*') over gitship.io.gitship.io.
+# Grants full permissions ('*') over gitship.io.
 # This role is intended for users authorized to modify roles and bindings within the cluster,
 # enabling them to delegate specific permissions to other users or groups as needed.
 
@@ -11,16 +11,16 @@ metadata:
   labels:
     app.kubernetes.io/name: gitship
     app.kubernetes.io/managed-by: kustomize
-  name: gitship.io-gitshipapp-admin-role
+  name: gitshipapp-admin-role
 rules:
 - apiGroups:
-  - gitship.io.gitship.io
+  - gitship.io
   resources:
   - gitshipapps
   verbs:
   - '*'
 - apiGroups:
-  - gitship.io.gitship.io
+  - gitship.io
   resources:
   - gitshipapps/status
   verbs:

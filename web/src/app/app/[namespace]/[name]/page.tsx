@@ -26,6 +26,11 @@ export default async function AppDetailsPage({ params }: { params: Promise<{ nam
         notFound()
     }
 
+    // Security/UX: Filter out internal URLs
+    const rawUrl = app.status?.appUrl || ""
+    const isInternal = rawUrl.includes(".svc.cluster.local") || rawUrl.includes("http://gitship-")
+    const appUrl = (rawUrl && !isInternal) ? rawUrl : null
+
     const statusColor = (phase: string) => {
         switch (phase) {
             case "Running": return "bg-green-500"
@@ -57,9 +62,9 @@ export default async function AppDetailsPage({ params }: { params: Promise<{ nam
                             <p className="text-muted-foreground mt-1">namespace: {app.metadata.namespace}</p>
                         </div>
                         <div className="flex gap-2">
-                            {app.status?.appUrl && (
+                            {appUrl && (
                                 <Button asChild variant="outline">
-                                    <Link href={app.status.appUrl} target="_blank">
+                                    <Link href={appUrl} target="_blank">
                                         <ExternalLink className="w-4 h-4 mr-2" /> Open App
                                     </Link>
                                 </Button>

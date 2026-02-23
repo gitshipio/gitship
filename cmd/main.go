@@ -107,7 +107,6 @@ func main() {
 		RegistryPushURL:     getEnv("REGISTRY_PUSH_URL", defaultPushURL),
 		RegistryPullURL:     getEnv("REGISTRY_PULL_URL", ""),
 		SystemNamespace:     systemNamespace,
-		ClusterIssuer:       getEnv("CLUSTER_ISSUER", "letsencrypt-prod"),
 		IngressClassName:    getEnv("INGRESS_CLASS_NAME", "nginx"),
 		DefaultStorageClass: getEnv("DEFAULT_STORAGE_CLASS", ""),
 		DefaultQuotaCPU:     getEnv("QUOTA_CPU", "4"),
@@ -239,6 +238,14 @@ func main() {
 		Config: config,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "GitshipApp")
+		os.Exit(1)
+	}
+	if err := (&gitshipiocontroller.GitshipIntegrationReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+		Config: config,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "GitshipIntegration")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder

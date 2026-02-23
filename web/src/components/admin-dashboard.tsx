@@ -4,20 +4,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Users, LayoutGrid, Server, Database, ShieldCheck, Activity, Github, ArrowRight } from "lucide-react"
+import { Users, LayoutGrid, Server, Database, ShieldCheck, Activity, Github, ArrowRight, Blocks } from "lucide-react"
 import { GitshipAppCard } from "@/components/gitship-app-card"
 import Link from "next/link"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
-import { GitshipAppList, GitshipUser } from "@/lib/types"
+import { GitshipAppList, GitshipUser, GitshipIntegration } from "@/lib/types"
 
 interface AdminDashboardProps {
     users: GitshipUser[]
     apps: GitshipAppList
+    integrations: GitshipIntegration[]
     nodes: any[]
     storageClasses: any[]
 }
 
-export function AdminDashboardUI({ users, apps, nodes, storageClasses }: AdminDashboardProps) {
+export function AdminDashboardUI({ users, apps, integrations, nodes, storageClasses }: AdminDashboardProps) {
     const searchParams = useSearchParams()
     const router = useRouter()
     const pathname = usePathname()
@@ -60,6 +61,15 @@ export function AdminDashboardUI({ users, apps, nodes, storageClasses }: AdminDa
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{apps.items.length}</div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Active Integrations</CardTitle>
+                        <Blocks className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{integrations.length}</div>
                     </CardContent>
                 </Card>
                 <Card>

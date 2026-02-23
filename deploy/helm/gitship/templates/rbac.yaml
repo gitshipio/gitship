@@ -4,13 +4,13 @@ metadata:
   name: {{ include "gitship.fullname" . }}-controller-role
 rules:
   - apiGroups: ["gitship.io"]
-    resources: ["gitshipapps", "gitshipusers", "users", "repowatchers"]
+    resources: ["gitshipapps", "gitshipusers", "users", "repowatchers", "gitshipintegrations"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: ["gitship.io"]
-    resources: ["gitshipapps/status", "gitshipusers/status", "users/status", "repowatchers/status"]
+    resources: ["gitshipapps/status", "gitshipusers/status", "users/status", "repowatchers/status", "gitshipintegrations/status"]
     verbs: ["get", "update", "patch"]
   - apiGroups: ["gitship.io"]
-    resources: ["gitshipapps/finalizers", "gitshipusers/finalizers", "users/finalizers", "repowatchers/finalizers"]
+    resources: ["gitshipapps/finalizers", "gitshipusers/finalizers", "users/finalizers", "repowatchers/finalizers", "gitshipintegrations/finalizers"]
     verbs: ["update"]
   - apiGroups: ["apps"]
     resources: ["deployments"]
@@ -31,7 +31,7 @@ metadata:
   name: {{ include "gitship.fullname" . }}-controller-rolebinding
 subjects:
   - kind: ServiceAccount
-    name: {{ include "gitship.fullname" . }}-controller
+    name: {{ include "gitship.fullname" . }}-controller-manager
     namespace: {{ .Release.Namespace }}
 roleRef:
   kind: ClusterRole
@@ -44,7 +44,7 @@ metadata:
   name: {{ include "gitship.fullname" . }}-dashboard-role
 rules:
   - apiGroups: ["gitship.io"]
-    resources: ["gitshipapps", "gitshipusers", "users"]
+    resources: ["gitshipapps", "gitshipusers", "users", "gitshipintegrations"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: [""]
     resources: ["namespaces", "nodes", "persistentvolumeclaims", "secrets", "services", "pods", "pods/log", "events", "resourcequotas"]

@@ -6,6 +6,7 @@ resources:
 - bases/gitship.io_users.yaml
 - bases/gitship.io_gitshipusers.yaml
 - bases/gitship.io_gitshipapps.yaml
+- bases/gitship.io_gitshipintegrations.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

@@ -2,5 +2,5 @@ apiVersion: v2
 name: gitship
 description: A Kubernetes-native PaaS for zero-config deployments.
 type: application
-version: 1.0.3
-appVersion: "1.0.3"
+version: 1.0.4
+appVersion: "1.0.4"

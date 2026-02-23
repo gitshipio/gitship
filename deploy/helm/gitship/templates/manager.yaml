@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "gitship.fullname" . }}-controller
+  name: {{ include "gitship.fullname" . }}-controller-manager
   namespace: {{ .Release.Namespace }}
   labels:
     app: {{ include "gitship.name" . }}-controller
@@ -15,7 +15,7 @@ spec:
       labels:
         app: {{ include "gitship.name" . }}-controller
     spec:
-      serviceAccountName: {{ include "gitship.fullname" . }}-controller
+      serviceAccountName: {{ include "gitship.fullname" . }}-controller-manager
       containers:
         - name: manager
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -31,8 +31,6 @@ spec:
               value: {{ .Values.controller.config.registryPullUrl | quote }}
             - name: SYSTEM_NAMESPACE
               value: {{ .Values.controller.config.systemNamespace | quote }}
-            - name: CLUSTER_ISSUER
-              value: {{ .Values.controller.config.clusterIssuer | quote }}
             - name: INGRESS_CLASS_NAME
               value: {{ .Values.controller.config.ingressClassName | quote }}
             - name: DEFAULT_STORAGE_CLASS
@@ -60,5 +58,5 @@ spec:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: {{ include "gitship.fullname" . }}-controller
+  name: {{ include "gitship.fullname" . }}-controller-manager
   namespace: {{ .Release.Namespace }}

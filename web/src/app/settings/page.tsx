@@ -13,10 +13,10 @@ export default async function SettingsPage() {
         redirect("/api/auth/signin")
     }
 
-    const { username, githubId, internalId } = resolveUserSession(session)
+    const { username, githubId, internalId, email } = resolveUserSession(session)
     
     // Ensure user record exists
-    await ensureGitshipUser(username, parseInt(githubId))
+    await ensureGitshipUser(username, parseInt(githubId), email)
     
     const [user, installation] = await Promise.all([
         getGitshipUser(internalId),

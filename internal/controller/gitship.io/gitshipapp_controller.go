@@ -18,12 +18,11 @@ package gitshipio
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"fmt"
 	"strings"
 	"time"
 
+	cmv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing/transport"
@@ -57,7 +56,6 @@ type ControllerConfig struct {
 	RegistryPushURL string
 	RegistryPullURL string
 	SystemNamespace string
-	ClusterIssuer   string
 
 	IngressClassName    string
 	DefaultStorageClass string
@@ -148,13 +146,8 @@ func (r *GitshipAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	log.Info("Resolved latest commit", "commit", latestCommit, "source", source.Type, "value", source.Value)
 
 	if gitshipApp.Status.LatestBuildID == latestCommit {
+		// 0. Resolve Image
 		_, image := r.resolveImageNames(gitshipApp, latestCommit)
-
-		// 0. Ensure Addons
-		if err := r.ensureAddons(ctx, gitshipApp); err != nil {
-			log.Error(err, "Failed to provision addons")
-			return ctrl.Result{}, err
-		}
 
 		if err := r.ensureVolumes(ctx, gitshipApp); err != nil {
 			return ctrl.Result{}, err
@@ -194,16 +187,27 @@ func (r *GitshipAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				gitshipApp.Status.LastDeployedAt = metav1.Now().Format(time.RFC3339)
 				statusChanged = true
 			}
+		}
 
-			if len(gitshipApp.Spec.Ingresses) > 0 {
-				proto := "http"
-				if gitshipApp.Spec.Ingresses[0].TLS {
-					proto = "https"
-				}
-				gitshipApp.Status.AppURL = fmt.Sprintf("%s://%s", proto, gitshipApp.Spec.Ingresses[0].Host)
-			} else {
-				gitshipApp.Status.AppURL = fmt.Sprintf("http://%s.%s.svc.cluster.local", gitshipApp.Name, gitshipApp.Namespace)
+		// Calculate AppURL based on Ingress
+		newAppURL := ""
+		if len(gitshipApp.Spec.Ingresses) > 0 {
+			proto := "http"
+			if gitshipApp.Spec.Ingresses[0].TLS {
+				proto = "https"
 			}
+			newAppURL = fmt.Sprintf("%s://%s", proto, gitshipApp.Spec.Ingresses[0].Host)
+		}
+
+		if gitshipApp.Status.AppURL != newAppURL {
+			gitshipApp.Status.AppURL = newAppURL
+			statusChanged = true
+		}
+
+		// Cleanup: Force clear if it still contains internal domain (fallback)
+		if strings.Contains(gitshipApp.Status.AppURL, ".svc.cluster.local") {
+			gitshipApp.Status.AppURL = ""
+			statusChanged = true
 		}
 
 		podList := &corev1.PodList{}
@@ -506,14 +510,17 @@ func (r *GitshipAppReconciler) ensureIngress(ctx context.Context, gitshipApp *gi
 	}
 
 	if anyTlsEnabled {
-		issuer := gitshipApp.Spec.TLS.Issuer
-		if issuer == "" {
-			issuer = r.Config.ClusterIssuer
-			if issuer == "" {
-				issuer = "letsencrypt-prod"
-			}
+		// Check if local Issuer exists (created by User Controller)
+		localIssuer := &cmv1.Issuer{}
+		err := r.Get(ctx, types.NamespacedName{Name: "letsencrypt-prod", Namespace: gitshipApp.Namespace}, localIssuer)
+		
+		if err == nil {
+			// Local issuer exists -> Use it
+			annotations["cert-manager.io/issuer"] = "letsencrypt-prod"
+		} else {
+			// No local issuer -> No certificate. We don't want a global fallback.
+			log.Info("Skipping certificate issuance: no local 'letsencrypt-prod' issuer found in namespace", "namespace", gitshipApp.Namespace)
 		}
-		annotations["cert-manager.io/cluster-issuer"] = issuer
 	}
 
 	if err != nil {
@@ -555,27 +562,6 @@ func (r *GitshipAppReconciler) ensureDeployment(ctx context.Context, gitshipApp 
 	var envVars []corev1.EnvVar
 	for k, v := range gitshipApp.Spec.Env {
 		envVars = append(envVars, corev1.EnvVar{Name: k, Value: v})
-	}
-
-	// Add Addon Credentials
-	for _, addon := range gitshipApp.Spec.Addons {
-		name := fmt.Sprintf("%s-%s", gitshipApp.Name, addon.Name)
-		switch strings.ToLower(addon.Type) {
-		case "postgres":
-			secretName := name + "-auth"
-			pwSecret := &corev1.Secret{}
-			password := "gitship-auto-generated-pw"
-			if err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: gitshipApp.Namespace}, pwSecret); err == nil {
-				if pw, ok := pwSecret.Data["password"]; ok {
-					password = string(pw)
-				}
-			}
-			url := fmt.Sprintf("postgresql://postgres:%s@%s:5432/app", password, name)
-			envVars = append(envVars, corev1.EnvVar{Name: "DATABASE_URL", Value: url})
-		case "redis":
-			url := fmt.Sprintf("redis://%s:6379", name)
-			envVars = append(envVars, corev1.EnvVar{Name: "REDIS_URL", Value: url})
-		}
 	}
 
 	var envFrom []corev1.EnvFromSource
@@ -1068,8 +1054,12 @@ func compareVolumes(a, b []corev1.Volume) bool {
 }
 
 func compareResources(a, b corev1.ResourceRequirements) bool {
-	return a.Limits.Cpu().String() == b.Limits.Cpu().String() &&
-		a.Limits.Memory().String() == b.Limits.Memory().String()
+	aqCpu := a.Limits[corev1.ResourceCPU]
+	bqCpu := b.Limits[corev1.ResourceCPU]
+	aqMem := a.Limits[corev1.ResourceMemory]
+	bqMem := b.Limits[corev1.ResourceMemory]
+
+	return aqCpu.Cmp(bqCpu) == 0 && aqMem.Cmp(bqMem) == 0
 }
 
 func comparePodSecurityContext(a, b *corev1.PodSecurityContext) bool {
@@ -1206,126 +1196,4 @@ func resolveProbes(hcConfig gitshipiov1alpha1.HealthCheckConfig) (liveness, read
 	}
 
 	return probe, probe
-}
-
-func (r *GitshipAppReconciler) ensureAddons(ctx context.Context, app *gitshipiov1alpha1.GitshipApp) error {
-	for _, addon := range app.Spec.Addons {
-		switch strings.ToLower(addon.Type) {
-		case "postgres":
-			if err := r.ensurePostgres(ctx, app, addon); err != nil {
-				return err
-			}
-		case "redis":
-			if err := r.ensureRedis(ctx, app, addon); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func (r *GitshipAppReconciler) ensurePostgres(ctx context.Context, app *gitshipiov1alpha1.GitshipApp, addon gitshipiov1alpha1.AddonConfig) error {
-	name := fmt.Sprintf("%s-%s", app.Name, addon.Name)
-	found := &appsv1.Deployment{}
-
-	// Check if secret exists first to reuse password
-	secretName := name + "-auth"
-	existingSecret := &corev1.Secret{}
-	password := ""
-
-	if err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: app.Namespace}, existingSecret); err == nil {
-		if pwBytes, ok := existingSecret.Data["password"]; ok {
-			password = string(pwBytes)
-		}
-	}
-
-	if password == "" {
-		// Generate random password
-		randomBytes := make([]byte, 16)
-		_, _ = rand.Read(randomBytes)
-		password = base64.StdEncoding.EncodeToString(randomBytes)
-
-		pwSecret := &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{Name: secretName, Namespace: app.Namespace},
-			StringData: map[string]string{"password": password},
-		}
-		if err := r.Create(ctx, pwSecret); err != nil {
-			return err
-		}
-	}
-
-	err := r.Get(ctx, types.NamespacedName{Name: name, Namespace: app.Namespace}, found)
-	if err == nil {
-		return nil
-	}
-
-	log.Info("Provisioning Addon: Postgres", "name", name)
-
-	svc := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: app.Namespace},
-		Spec: corev1.ServiceSpec{
-			Selector: map[string]string{"addon": name},
-			Ports:    []corev1.ServicePort{{Port: 5432, TargetPort: intstr.FromInt(5432)}},
-		},
-	}
-	_ = r.Create(ctx, svc)
-
-	dep := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: app.Namespace, Labels: map[string]string{"addon": name}},
-		Spec: appsv1.DeploymentSpec{
-			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"addon": name}},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"addon": name}},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{{
-						Name:  "postgres",
-						Image: "postgres:15-alpine",
-						Env: []corev1.EnvVar{
-							{Name: "POSTGRES_PASSWORD", Value: password},
-							{Name: "POSTGRES_DB", Value: "app"},
-						},
-						Ports: []corev1.ContainerPort{{ContainerPort: 5432}},
-					}},
-				},
-			},
-		},
-	}
-	return r.Create(ctx, dep)
-}
-
-func (r *GitshipAppReconciler) ensureRedis(ctx context.Context, app *gitshipiov1alpha1.GitshipApp, addon gitshipiov1alpha1.AddonConfig) error {
-	name := fmt.Sprintf("%s-%s", app.Name, addon.Name)
-	found := &appsv1.Deployment{}
-	if err := r.Get(ctx, types.NamespacedName{Name: name, Namespace: app.Namespace}, found); err == nil {
-		return nil
-	}
-
-	log.Info("Provisioning Addon: Redis", "name", name)
-
-	svc := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: app.Namespace},
-		Spec: corev1.ServiceSpec{
-			Selector: map[string]string{"addon": name},
-			Ports:    []corev1.ServicePort{{Port: 6379, TargetPort: intstr.FromInt(6379)}},
-		},
-	}
-	_ = r.Create(ctx, svc)
-
-	dep := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: app.Namespace, Labels: map[string]string{"addon": name}},
-		Spec: appsv1.DeploymentSpec{
-			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"addon": name}},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"addon": name}},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{{
-						Name:  "redis",
-						Image: "redis:7-alpine",
-						Ports: []corev1.ContainerPort{{ContainerPort: 6379}},
-					}},
-				},
-			},
-		},
-	}
-	return r.Create(ctx, dep)
 }

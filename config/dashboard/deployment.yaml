@@ -1,20 +1,20 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: gitship-dashboard
+  name: dashboard
   labels:
-    app: gitship-dashboard
+    app: dashboard
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: gitship-dashboard
+      app: dashboard
   template:
     metadata:
       labels:
-        app: gitship-dashboard
+        app: dashboard
     spec:
-      serviceAccountName: gitship-dashboard
+      serviceAccountName: dashboard
       containers:
         - name: dashboard
           image: gitship-dashboard:latest

@@ -1,5 +1,5 @@
 import { auth } from "@/auth"
-import { getGitshipUsers, getGitshipAppsAdmin, getClusterNodes, getStorageClasses } from "@/lib/api"
+import { getGitshipUsers, getGitshipAppsAdmin, getClusterNodes, getStorageClasses, getGitshipIntegrationsAdmin } from "@/lib/api"
 import { isAdmin as checkAdmin, resolveUserSession } from "@/lib/auth-utils"
 import { redirect } from "next/navigation"
 import { AdminDashboardUI } from "@/components/admin-dashboard"
@@ -11,10 +11,10 @@ export default async function AdminPage() {
         redirect("/api/auth/signin")
     }
 
-    const { username, githubId, internalId } = resolveUserSession(session)
+    const { username, githubId, internalId, email } = resolveUserSession(session)
     
     // Ensure user record exists (triggers migration for legacy admins)
-    await ensureGitshipUser(username, parseInt(githubId))
+    await ensureGitshipUser(username, parseInt(githubId), email)
     
     const isUserAdmin = await checkAdmin(internalId)
     
@@ -23,9 +23,10 @@ export default async function AdminPage() {
         redirect("/")
     }
 
-    const [users, apps, nodes, storageClasses] = await Promise.all([
+    const [users, apps, integrations, nodes, storageClasses] = await Promise.all([
         getGitshipUsers(),
-        getGitshipAppsAdmin(), // Use explicit admin function
+        getGitshipAppsAdmin(), 
+        getGitshipIntegrationsAdmin(), // Fetch all integrations
         getClusterNodes(),
         getStorageClasses()
     ])
@@ -34,6 +35,7 @@ export default async function AdminPage() {
     const plainData = JSON.parse(JSON.stringify({
         users,
         apps,
+        integrations,
         nodes,
         storageClasses
     }))
@@ -42,6 +44,7 @@ export default async function AdminPage() {
         <AdminDashboardUI 
             users={plainData.users} 
             apps={plainData.apps} 
+            integrations={plainData.integrations}
             nodes={plainData.nodes} 
             storageClasses={plainData.storageClasses} 
         />

@@ -6,7 +6,6 @@ data:
   REGISTRY_PUSH_URL: "" # Leave empty for dynamic default (gitship-registry.gitship-system...)
   REGISTRY_PULL_URL: "" # Leave empty for smart fallback (localhost:30005 or Push URL)
   SYSTEM_NAMESPACE: "gitship-system"
-  CLUSTER_ISSUER: "letsencrypt-prod"
   INGRESS_CLASS_NAME: "nginx"
   DEFAULT_STORAGE_CLASS: ""
   QUOTA_CPU: "4"

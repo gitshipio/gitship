@@ -39,12 +39,9 @@ spec:
           spec:
             description: GitshipUserSpec defines the desired state of GitshipUser.
             properties:
-              customSpaces:
-                description: List of custom namespace suffixes (e.g. "staging" ->
-                  "gitship-user-simon-staging")
-                items:
-                  type: string
-                type: array
+              email:
+                description: Email for Let's Encrypt notifications and Issuer registration
+                type: string
               githubID:
                 format: int64
                 type: integer

@@ -61,19 +61,6 @@ type GitshipAppSpec struct {
 
 	// List of Secrets to mount as files
 	SecretMounts []SecretMountConfig `json:"secretMounts,omitempty"`
-
-	// Addons (Managed Databases, etc)
-	Addons []AddonConfig `json:"addons,omitempty"`
-}
-
-type AddonConfig struct {
-	// Type of addon (e.g. "postgres", "redis")
-	Type string `json:"type"`
-	// Name of the addon instance
-	Name string `json:"name"`
-	// Size of the addon instance (e.g. "small", "medium")
-	// +kubebuilder:default:="small"
-	Size string `json:"size,omitempty"`
 }
 
 type SecretMountConfig struct {
@@ -141,8 +128,6 @@ type SourceConfig struct {
 }
 
 type TLSConfig struct {
-	// Optional: Custom ClusterIssuer name (defaults to "letsencrypt-prod" if empty)
-	Issuer string `json:"issuer,omitempty"`
 }
 
 type UpdateStrategy struct {

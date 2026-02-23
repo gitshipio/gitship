@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useTransition } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Globe, Network, Save, Loader2, Lock, Plus, Trash2, ArrowRight, ChevronDown } from "lucide-react"
+import { Globe, Network, Save, Loader2, Lock, Plus, Trash2, ArrowRight, ChevronDown, Copy, Check } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
@@ -246,15 +246,18 @@ export function AppServices({ appName, namespace, serviceType, initialIngresses,
             </CardHeader>
             <CardContent className="p-4">
                 {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : services.length > 0 ? (
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                         {services.map(svc => (
-                            <div key={svc.name} className="flex items-center justify-between text-xs p-2 border rounded bg-muted/5">
-                                <span className="font-bold">{svc.name}</span>
-                                <div className="flex gap-1">
-                                    {svc.ports.map((p, i) => (
-                                        <Badge key={i} variant="outline" className="text-[9px]">{p.port}:{p.targetPort}</Badge>
-                                    ))}
+                            <div key={svc.name} className="space-y-1.5">
+                                <div className="flex items-center justify-between text-xs p-2 border rounded bg-muted/5">
+                                    <span className="font-bold">{svc.name}</span>
+                                    <div className="flex gap-1">
+                                        {svc.ports.map((p, i) => (
+                                            <Badge key={i} variant="outline" className="text-[9px]">{p.port}:{p.targetPort}</Badge>
+                                        ))}
+                                    </div>
                                 </div>
+                                <InternalDomainItem domain={`${svc.name}.${namespace}.svc.cluster.local`} />
                             </div>
                         ))}
                     </div>
@@ -349,6 +352,31 @@ function IngressRuleRow({ rule, availablePorts, onUpdate, onRemove }: any) {
                     </div>
                 </div>
             )}
+        </div>
+    )
+}
+
+function InternalDomainItem({ domain }: { domain: string }) {
+    const [copied, setCopied] = useState(false)
+
+    const copyToClipboard = () => {
+        navigator.clipboard.writeText(domain)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+    }
+
+    return (
+        <div className="group/item flex items-center gap-2 p-1.5 px-2 rounded-md bg-sky-500/5 border border-sky-500/10 transition-colors hover:bg-sky-500/10">
+            <Badge variant="outline" className="text-[8px] uppercase font-black bg-sky-500/10 text-sky-600 border-sky-500/20 px-1 h-3.5 shrink-0">Internal DNS</Badge>
+            <code className="text-[9px] font-mono text-sky-700 dark:text-sky-300 truncate flex-1">{domain}</code>
+            <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-5 w-5 opacity-0 group-hover/item:opacity-100 transition-opacity" 
+                onClick={copyToClipboard}
+            >
+                {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3 text-sky-600" />}
+            </Button>
         </div>
     )
 }

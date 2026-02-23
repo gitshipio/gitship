@@ -1,7 +1,7 @@
 # This rule is not used by the project gitship itself.
 # It is provided to allow the cluster admin to help manage permissions for users.
 #
-# Grants read-only access to gitship.io.gitship.io resources.
+# Grants read-only access to gitship.io resources.
 # This role is intended for users who need visibility into these resources
 # without permissions to modify them. It is ideal for monitoring purposes and limited-access viewing.
 
@@ -11,10 +11,10 @@ metadata:
   labels:
     app.kubernetes.io/name: gitship
     app.kubernetes.io/managed-by: kustomize
-  name: gitship.io-user-viewer-role
+  name: user-viewer-role
 rules:
 - apiGroups:
-  - gitship.io.gitship.io
+  - gitship.io
   resources:
   - users
   verbs:
@@ -22,7 +22,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - gitship.io.gitship.io
+  - gitship.io
   resources:
   - users/status
   verbs:
