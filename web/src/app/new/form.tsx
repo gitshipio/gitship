@@ -1,17 +1,14 @@
 "use client"
 
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { createApp } from "./actions"
-import { useFormStatus } from "react-dom"
 import { useState, useMemo, useRef, useEffect, useTransition } from "react"
-import { useRouter } from "next/navigation"
 import { GitHubRepo } from "@/lib/github"
 import { RegistryConfig } from "@/lib/types"
-import { Search, Globe, Lock, Check, Loader2, ChevronDown, Settings2, ArrowRight, Github, Database, Trash2, Plus, Clock, GitBranch, Tag, Hash } from "lucide-react"
+import { Search, Globe, Lock, Check, Loader2, ChevronDown, Settings2, ArrowRight, Github, Database, Trash2, Plus, Clock, GitBranch, Tag, Hash, AlertCircle } from "lucide-react"
 import { cn, stripUnits } from "@/lib/utils"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 
@@ -24,10 +21,9 @@ function SubmitButton({ pending }: { pending: boolean }) {
 }
 
 export function NewAppForm({ repos = [], registries = [] }: { repos?: GitHubRepo[], registries?: RegistryConfig[] }) {
-  const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [message, setMessage] = useState("")
-  const [errors, setErrors] = useState<Record<string, string[]>>({})
+  const [, setErrors] = useState<Record<string, string[]>>({})
   
   // Phase 1 State
   const [searchValue, setSearchValue] = useState("")
@@ -65,18 +61,18 @@ export function NewAppForm({ repos = [], registries = [] }: { repos?: GitHubRepo
 
   const addPortMapping = () => setPorts([...ports, { name: "", port: 80, targetPort: 80, protocol: "TCP" }])
   const removePortMapping = (idx: number) => setPorts(ports.filter((_, i) => i !== idx))
-  const updatePortMapping = (idx: number, field: string, val: any) => {
+  const updatePortMapping = (idx: number, field: string, val: string | number) => {
     const updated = [...ports]
-    // @ts-ignore
+    // @ts-expect-error known dynamic access
     updated[idx][field] = val
     setPorts(updated)
   }
 
-  const addVolume = () => setVolumes([...volumes, { name: "", mountPath: "", size: "1Gi" }])
+  const addVolume = () => setVolumes([...volumes, { name: "", mountPath: "", size: "1024" }])
   const removeVolume = (idx: number) => setVolumes(volumes.filter((_, i) => i !== idx))
   const updateVolume = (idx: number, field: string, val: string) => {
     const updated = [...volumes]
-    // @ts-ignore
+    // @ts-expect-error known dynamic access
     updated[idx][field] = val
     setVolumes(updated)
   }
@@ -178,7 +174,8 @@ export function NewAppForm({ repos = [], registries = [] }: { repos?: GitHubRepo
             } else if (result?.message) {
                 setMessage(result.message)
             }
-        } catch (err: any) {
+        } catch (err: unknown) {
+            // @ts-expect-error dynamic access
             setMessage(`Unexpected error: ${err.message}`)
         }
     })
@@ -331,7 +328,7 @@ export function NewAppForm({ repos = [], registries = [] }: { repos?: GitHubRepo
                                             className="flex h-12 w-full items-center justify-between rounded-md border-2 border-input bg-background px-3 py-2 text-xs appearance-none pr-8 font-bold"
                                             value={sourceType}
                                             onChange={e => {
-                                                setSourceType(e.target.value as any)
+                                                setSourceType(e.target.value as "branch" | "tag" | "commit")
                                                 setSearchQuery("")
                                             }}
                                             name="sourceType"
@@ -623,25 +620,4 @@ export function NewAppForm({ repos = [], registries = [] }: { repos?: GitHubRepo
       </form>
     </div>
   )
-}
-
-function AlertCircle(props: any) {
-    return (
-        <svg
-            {...props}
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        >
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" x2="12" y1="8" y2="12" />
-            <line x1="12" x2="12.01" y1="16" y2="16" />
-        </svg>
-    )
 }

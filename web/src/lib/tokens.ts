@@ -14,7 +14,7 @@ export async function verifyConsoleToken(token: string) {
   try {
     const { payload } = await jwtVerify(token, SECRET)
     return payload as { namespace: string; podName: string; internalId: string }
-  } catch (e) {
+  } catch {
     return null
   }
 }

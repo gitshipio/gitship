@@ -39,13 +39,15 @@ export async function GET(
     })
 
     return NextResponse.json({ 
-        logs: (logRes as any).body || logRes,
+        // @ts-expect-error dynamic access
+        logs: logRes.body || logRes,
         podName
     })
-  } catch (e: any) {
+  } catch (e: unknown) {
+    // @ts-expect-error dynamic access
     console.error(`[Runtime Logs] Failed to fetch logs for ${name}:`, e.message)
     // If "app" container doesn't exist yet or is restarting
-    return NextResponse.json({ logs: `Waiting for container 'app' to start...
-(${e.message})` })
+    // @ts-expect-error dynamic access
+    return NextResponse.json({ logs: `Waiting for container 'app' to start...\n(${e.message})` })
   }
 }

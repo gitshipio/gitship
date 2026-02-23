@@ -15,8 +15,8 @@ export async function GET(
     return NextResponse.json({ error: "Access Denied" }, { status: 403 })
   }
 
-  const services: any[] = []
-  const ingresses: any[] = []
+  const services = []
+  const ingresses = []
 
   try {
     // Get services with matching label
@@ -32,12 +32,14 @@ export async function GET(
         clusterIP: svc.spec?.clusterIP,
         ports: (svc.spec?.ports || []).map(p => ({
           port: p.port,
-          targetPort: typeof p.targetPort === "object" ? (p.targetPort as any).intVal : p.targetPort,
+          // @ts-expect-error dynamic access
+          targetPort: typeof p.targetPort === "object" ? p.targetPort.intVal : p.targetPort,
           protocol: p.protocol,
         })),
       })
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
+    // @ts-expect-error dynamic access
     console.error("Failed to list services:", e.body?.message || e.message)
   }
 

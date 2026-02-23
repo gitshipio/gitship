@@ -47,6 +47,10 @@ type GitshipIntegrationReconciler struct {
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 
+const (
+	phaseDisabled = "Disabled"
+)
+
 func (r *GitshipIntegrationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := logf.FromContext(ctx)
 
@@ -202,10 +206,9 @@ func (r *GitshipIntegrationReconciler) reconcileCloudflareTunnel(ctx context.Con
 			changed = true
 		}
 
-		// Simplified comparison for PodSpec (mainly resources)
 		currentCpu := dep.Spec.Template.Spec.Containers[0].Resources.Limits[corev1.ResourceCPU]
 		currentMem := dep.Spec.Template.Spec.Containers[0].Resources.Limits[corev1.ResourceMemory]
-		
+
 		targetCpu, _ := resource.ParseQuantity(cpuLimit)
 		targetMem, _ := resource.ParseQuantity(memLimit)
 
@@ -231,7 +234,7 @@ func (r *GitshipIntegrationReconciler) reconcileCloudflareTunnel(ctx context.Con
 		targetPhase = "Pending"
 		targetMessage = "Waiting for pods to start"
 	} else if *dep.Spec.Replicas == 0 {
-		targetPhase = "Disabled"
+		targetPhase = phaseDisabled
 		targetMessage = "Integration is scaled to 0"
 	}
 
@@ -263,8 +266,8 @@ func (r *GitshipIntegrationReconciler) cleanupIntegration(ctx context.Context, i
 		_ = r.Delete(ctx, dep)
 	}
 
-	if integration.Status.Phase != "Disabled" {
-		integration.Status.Phase = "Disabled"
+	if integration.Status.Phase != phaseDisabled {
+		integration.Status.Phase = phaseDisabled
 		integration.Status.Message = "Integration is disabled"
 		_ = r.Status().Update(ctx, integration)
 	}

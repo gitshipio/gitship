@@ -1,7 +1,7 @@
 "use client"
 
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Cpu, MemoryStick, Box, Activity, Zap, TrendingUp, Info, Loader2, Settings2, Save, X, Database, Blocks, CheckCircle2, AlertCircle } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Cpu, MemoryStick, Box, Zap, Loader2, Settings2, Save, X, Database, Blocks, CheckCircle2, AlertCircle, Info } from "lucide-react"
 import { cn, parseResourceValue, stripUnits } from "@/lib/utils"
 import { useState, useEffect } from "react"
 import { Progress } from "@/components/ui/progress"
@@ -263,8 +263,6 @@ function AppResourceRow({ app, onUpdate }: { app: AppMetrics, onUpdate: () => vo
     const handleSave = async () => {
         setLoading(true)
         try {
-            // Strictly append units. User only enters numbers.
-            // We assume input is always a valid number string.
             const cpuVal = cpu.trim() + "m"
             const memVal = mem.trim() + "Mi"
             const storageVal = storage.trim() + "Mi"
@@ -315,7 +313,8 @@ function AppResourceRow({ app, onUpdate }: { app: AppMetrics, onUpdate: () => vo
                 setErrorMsg(data.error || "Failed to update")
                 setTimeout(() => setErrorMsg(null), 5000)
             }
-        } catch (e: any) {
+        } catch (e: unknown) {
+            // @ts-expect-error known dynamic access
             setErrorMsg(e.message)
             setTimeout(() => setErrorMsg(null), 5000)
         } finally {

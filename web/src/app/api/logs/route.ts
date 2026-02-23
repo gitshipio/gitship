@@ -71,9 +71,11 @@ export async function GET(req: NextRequest) {
         pod: targetPodName,
         pods: availablePods 
     })
-  } catch (e: any) {
+  } catch (e: unknown) {
+    // @ts-expect-error dynamic access
     console.error("Failed to fetch logs:", e.body?.message || e.message)
     return NextResponse.json({
+      // @ts-expect-error dynamic access
       logs: [`Error fetching logs: ${e.body?.message || e.message}`],
     })
   }

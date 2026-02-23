@@ -13,7 +13,7 @@ export function parseResourceValue(val: string | number): number {
     if (s.endsWith("gi")) return parseFloat(s) * 1024 * 1024 * 1024
     if (s.endsWith("mi")) return parseFloat(s) * 1024 * 1024
     if (s.endsWith("ki")) return parseFloat(s) * 1024
-    return parseFloat(s) * 1000 // Treat unitless as Cores -> Millicores
+    return parseFloat(s) * 1000
 }
 
 export function stripUnits(val: string | number | undefined, unit: 'cpu' | 'mem'): string {

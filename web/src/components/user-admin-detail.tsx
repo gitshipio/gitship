@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -29,7 +29,7 @@ interface UserAdminDetailProps {
     user: GitshipUser
     apps: GitshipApp[]
     integrations: GitshipIntegration[]
-    quotas: any
+    quotas: { hard: Record<string, string>; used: Record<string, string> } | null
 }
 
 export function UserAdminDetailUI({ user, apps, integrations, quotas }: UserAdminDetailProps) {
@@ -59,7 +59,8 @@ export function UserAdminDetailUI({ user, apps, integrations, quotas }: UserAdmi
             })
 
             router.refresh()
-        } catch (e: any) {
+        } catch (e: unknown) {
+            // @ts-expect-error dynamic access
             alert(e.message)
         } finally {
             setLoading(false)
@@ -111,7 +112,7 @@ export function UserAdminDetailUI({ user, apps, integrations, quotas }: UserAdmi
                             <CardTitle className="text-sm font-bold uppercase tracking-wider opacity-70">Live Consumption</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <ResourceUsage data={quotas} username={user.metadata.name} />
+                            <ResourceUsage data={quotas || undefined} username={user.metadata.name} />
                         </CardContent>
                     </Card>
 

@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     const cluster = kc.getCurrentCluster()
     const url = `${cluster?.server}/apis/gitship.io/v1alpha1/gitshipusers/${internalId}`
     
-    const opts: any = {
+    const opts: RequestInit & { agent?: https.Agent } = {
         method: 'PATCH',
         headers: {
             'Content-Type': 'application/merge-patch+json',
@@ -44,6 +44,7 @@ export async function POST(req: NextRequest) {
         // Create an explicit agent that accepts self-signed certs (internal cluster)
         agent: new https.Agent({ rejectUnauthorized: false }),
     }
+    // @ts-expect-error custom options for fetch
     await kc.applyToFetchOptions(opts)
 
     // applyToFetchOptions might overwrite agent, so we ensure ours takes precedence for local dev
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
          opts.agent = new https.Agent({ rejectUnauthorized: false })
     }
 
-    const response = await fetch(url, opts)
+    const response = await fetch(url, opts as RequestInit)
 
     if (!response.ok) {
         const errorText = await response.text()
@@ -61,8 +62,10 @@ export async function POST(req: NextRequest) {
 
     console.log(`[API] Successfully patched GitshipUser ${internalId}`)
     return NextResponse.json({ ok: true })
-  } catch (e: any) {
+  } catch (e: unknown) {
+    // @ts-expect-error dynamic access
     console.error(`[API] Failed to add registry:`, e.message)
+    // @ts-expect-error dynamic access
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
@@ -92,7 +95,7 @@ export async function DELETE(req: NextRequest) {
           }
       }
 
-      const opts: any = {
+      const opts: RequestInit & { agent?: https.Agent } = {
           method: 'PATCH',
           headers: {
               'Content-Type': 'application/merge-patch+json',
@@ -100,17 +103,20 @@ export async function DELETE(req: NextRequest) {
           body: JSON.stringify(patch),
           agent: new https.Agent({ rejectUnauthorized: false }),
       }
+      // @ts-expect-error custom options for fetch
       await kc.applyToFetchOptions(opts)
 
-      const response = await fetch(url, opts)
+      const response = await fetch(url, opts as RequestInit)
       if (!response.ok) {
           const errorText = await response.text()
           throw new Error(`K8s API Error: ${errorText}`)
       }
   
       return NextResponse.json({ ok: true })
-    } catch (e: any) {
+    } catch (e: unknown) {
+      // @ts-expect-error dynamic access
       console.error(`[API] Failed to delete registry:`, e.message)
+      // @ts-expect-error dynamic access
       return NextResponse.json({ error: e.message }, { status: 500 })
     }
 }

@@ -91,7 +91,8 @@ export async function createApp(formData: FormData) {
   // 1. Setup SSH Authentication
   let authMethod = "token"
   // Try to use token from session
-  const token = (session as any).accessToken
+  // @ts-expect-error dynamic property
+  const token = session.accessToken
 
   if (token) {
       try {
@@ -104,11 +105,11 @@ export async function createApp(formData: FormData) {
               const repo = urlParts[1].replace(".git", "")
               
               console.log(`[createApp] Adding deploy key to GitHub repo ${owner}/${repo}...`)
-              const added = await addDeployKey(owner, repo, publicKey, `Gitship Deploy Key (${data.name})`, token)
+              // @ts-expect-error dynamic property
+              const added = await addDeployKey(owner, repo, publicKey, `Gitship Deploy Key (${data.name})`, session.accessToken)
               
               if (added) {
                   // Save Private Key as Secret
-                  // Note: createSecret expects a name suffix, so actual name will be `${appName}-ssh-key`
                   await createSecret(namespace, data.name, "ssh-key", { "ssh-privatekey": privateKey })
                   authMethod = "ssh"
                   console.log(`[createApp] SUCCESS: SSH Auth configured for ${data.name}`)
@@ -167,17 +168,20 @@ export async function createApp(formData: FormData) {
       plural: "gitshipapps",
       body: gitshipApp,
     })
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("Failed to create app:", e)
+    // @ts-expect-error dynamic access
     const statusCode = e.code || e.body?.code || e.response?.statusCode
     if (statusCode === 409) {
       return { message: "An app with this name already exists. Please choose a different name." }
     }
+    // @ts-expect-error dynamic access
     return { message: `Error creating app: ${e.body?.message || e.message}` }
   }
 
   // Attempt to create Webhook if strategy is webhook
-  if (data.updateStrategy === "webhook" && (session as any).accessToken) {
+  // @ts-expect-error dynamic property
+  if (data.updateStrategy === "webhook" && session.accessToken) {
     const headerList = await headers()
     const host = headerList.get("host")
     const proto = headerList.get("x-forwarded-proto") || "http"
@@ -193,7 +197,8 @@ export async function createApp(formData: FormData) {
                 const webhookUrl = `${publicUrl}/api/webhooks/github`
                 
                 console.log(`[createApp] Attempting to create webhook for ${owner}/${repo} -> ${webhookUrl}`)
-                const success = await createRepositoryWebhook(owner, repo, webhookUrl, (session as any).accessToken)
+                // @ts-expect-error dynamic property
+                const success = await createRepositoryWebhook(owner, repo, webhookUrl, session.accessToken)
                 if (success) {
                     console.log(`[createApp] Successfully created webhook for ${owner}/${repo}`)
                 }

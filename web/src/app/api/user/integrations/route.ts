@@ -46,8 +46,10 @@ export async function POST(req: NextRequest) {
         })
 
         return NextResponse.json({ ok: true })
-    } catch (e: any) {
+    } catch (e: unknown) {
+        // @ts-expect-error dynamic access
         console.error("[API] Failed to create integration:", e.message)
+        // @ts-expect-error dynamic access
         return NextResponse.json({ error: e.message }, { status: 500 })
     }
 }
@@ -66,7 +68,7 @@ export async function PATCH(req: NextRequest) {
         console.log(`[API] PATCH GitshipIntegration ${name} in ${namespace}:`, JSON.stringify(patchData))
 
         // Create a JSON Patch array
-        const patch: any[] = []
+        const patch = []
         
         if (patchData.spec) {
             if (patchData.spec.resources) {
@@ -94,12 +96,17 @@ export async function PATCH(req: NextRequest) {
             plural: "gitshipintegrations",
             name,
             body: patch
-        }, { headers: { "Content-Type": "application/json-patch+json" } } as any)
+        }, { 
+            // @ts-expect-error custom headers for JSON Patch
+            headers: { "Content-Type": "application/json-patch+json" } 
+        })
 
         console.log(`[API] SUCCESS: Patched GitshipIntegration ${name} in ${namespace}`)
         return NextResponse.json({ ok: true })
-    } catch (e: any) {
+    } catch (e: unknown) {
+        // @ts-expect-error dynamic access
         console.error("[API] Failed to patch integration:", e.message)
+        // @ts-expect-error dynamic access
         return NextResponse.json({ error: e.message }, { status: 500 })
     }
 }
@@ -124,7 +131,8 @@ export async function DELETE(req: NextRequest) {
             name
         })
         return NextResponse.json({ ok: true })
-    } catch (e: any) {
+    } catch (e: unknown) {
+        // @ts-expect-error dynamic access
         return NextResponse.json({ error: e.message }, { status: 500 })
     }
 }

@@ -17,7 +17,7 @@ export async function POST(
 
   try {
     // Get the current state to see if annotations exist
-    const response: any = await k8sCustomApi.getNamespacedCustomObject({
+    const response = await k8sCustomApi.getNamespacedCustomObject({
       group: "gitship.io",
       version: "v1alpha1",
       namespace,
@@ -26,7 +26,7 @@ export async function POST(
     })
     const app = response.body || response
 
-    const patch: any[] = []
+    const patch = []
     
     // If annotations don't exist, we must add the object first
     if (!app.metadata.annotations) {
@@ -52,12 +52,17 @@ export async function POST(
       plural: "gitshipapps",
       name,
       body: patch,
-    }, { headers: { "Content-Type": "application/json-patch+json" } } as any)
+    }, { 
+      // @ts-expect-error custom headers for JSON Patch
+      headers: { "Content-Type": "application/json-patch+json" } 
+    })
 
     return NextResponse.json({ ok: true })
-  } catch (e: any) {
+  } catch (e: unknown) {
+    // @ts-expect-error dynamic access
     console.error("Failed to trigger rebuild:", e.body?.message || e.message)
     return NextResponse.json(
+      // @ts-expect-error dynamic access
       { error: e.body?.message || e.message },
       { status: 500 }
     )

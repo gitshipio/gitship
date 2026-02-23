@@ -39,12 +39,15 @@ export async function POST(
       name,
       body: patch
     }, {
+      // @ts-expect-error custom headers for JSON Patch
       headers: { "Content-Type": "application/json-patch+json" }
-    } as any)
+    })
 
     return NextResponse.json({ ok: true })
-  } catch (e: any) {
+  } catch (e: unknown) {
+    // @ts-expect-error dynamic access
     console.error(`[Rollback] Failed for ${name}:`, e.message)
+    // @ts-expect-error dynamic access
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }

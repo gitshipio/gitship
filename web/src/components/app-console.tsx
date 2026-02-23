@@ -4,8 +4,6 @@ import { useEffect, useRef, useState } from "react"
 import { Terminal } from "@xterm/xterm"
 import { FitAddon } from "@xterm/addon-fit"
 import "@xterm/xterm/css/xterm.css"
-import { Button } from "./ui/button"
-import { Loader2 } from "lucide-react"
 import { generateConsoleTokenAction } from "@/app/actions/console"
 
 interface AppConsoleProps {
@@ -14,7 +12,7 @@ interface AppConsoleProps {
     podName: string
 }
 
-export function AppConsole({ namespace, appName, podName }: AppConsoleProps) {
+export function AppConsole({ namespace, podName }: AppConsoleProps) {
     const terminalRef = useRef<HTMLDivElement>(null)
     const wsRef = useRef<WebSocket | null>(null)
     const [isConnected, setIsConnected] = useState(false)
@@ -87,10 +85,11 @@ export function AppConsole({ namespace, appName, podName }: AppConsoleProps) {
                     term.dispose()
                     resizeObserver.disconnect()
                 }
-            } catch (err: any) {
+            } catch (err: unknown) {
+                // @ts-expect-error dynamic access
                 setError(err.message || "Failed to authorize console session")
-                term.writeln(`
-\x1b[31m[Error] ${err.message}\x1b[0m`)
+                // @ts-expect-error dynamic access
+                term.writeln(`\r\n\x1b[31m[Error] ${err.message}\x1b[0m`)
             }
         }
 

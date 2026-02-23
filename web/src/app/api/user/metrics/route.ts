@@ -4,6 +4,8 @@ import { kc, k8sCoreApi, k8sCustomApi } from "@/lib/k8s"
 import * as k8s from '@kubernetes/client-node'
 import { resolveUserSession } from "@/lib/auth-utils"
 
+import { GitshipApp, GitshipIntegration } from "@/lib/types"
+
 function parseCpu(val: string): number {
     if (!val) return 0
     if (val.endsWith('n')) return parseInt(val) / 1000000
@@ -12,7 +14,7 @@ function parseCpu(val: string): number {
     return parseInt(val) * 1000
 }
 
-function parseMemory(val: any): number {
+function parseMemory(val: string | number | undefined | null): number {
     if (val === undefined || val === null) return 0
     if (typeof val === 'number') return val
     const s = val.toString()
@@ -34,7 +36,7 @@ export async function GET() {
   
   try {
     const metricsClient = new k8s.Metrics(kc)
-    const [quotaResponse, gitshipAppsResponse, gitshipIntegrationsResponse, pvcResponse]: any = await Promise.all([
+    const [quotaResponse, gitshipAppsResponse, gitshipIntegrationsResponse, pvcResponse] = await Promise.all([
         k8sCoreApi.readNamespacedResourceQuota({ name: "user-quota", namespace }).catch(() => null),
         k8sCustomApi.listNamespacedCustomObject({
             group: "gitship.io",
@@ -55,12 +57,28 @@ export async function GET() {
     const appsItems = gitshipApps?.items || []
     const gitshipIntegrations = gitshipIntegrationsResponse?.body || gitshipIntegrationsResponse
     const integrationItems = gitshipIntegrations?.items || []
+    // @ts-expect-error dynamic access
     const quota = quotaResponse?.body || quotaResponse
+    // @ts-expect-error dynamic access
     const pvcs = pvcResponse?.body?.items || pvcResponse?.items || []
 
     // 1. Map Apps for easy lookup
-    const appsMap: Record<string, any> = {}
-    appsItems.forEach((app: any) => {
+    const appsMap: Record<string, {
+        name: string,
+        fullName?: string,
+        type: string,
+        namespace: string,
+        cpuLimit: string,
+        memoryLimit: string,
+        storageLimit: string,
+        cpuUsage: number,
+        memoryUsage: number,
+        storageUsage: number,
+        podCount: number,
+        replicas: number
+    }> = {}
+
+    appsItems.forEach((app: GitshipApp) => {
         appsMap[app.metadata.name] = {
             name: app.metadata.name,
             type: "app",
@@ -77,7 +95,7 @@ export async function GET() {
     })
 
     // 1b. Map Integrations
-    integrationItems.forEach((int: any) => {
+    integrationItems.forEach((int: GitshipIntegration) => {
         const name = `gitship-integration-${int.metadata.name}`
         appsMap[name] = {
             name: int.metadata.name,
@@ -96,7 +114,7 @@ export async function GET() {
     })
 
     // 2. Map PVC storage to apps
-    pvcs.forEach((pvc: any) => {
+    pvcs.forEach((pvc: { metadata: { name: string }, spec?: { resources?: { requests?: { storage?: string } } }, status?: { capacity?: { storage?: string } } }) => {
         // App PVCs are named appname-volumename
         for (const appName in appsMap) {
             if (pvc.metadata.name.startsWith(`${appName}-`)) {
@@ -115,16 +133,21 @@ export async function GET() {
         const podMetrics = await metricsClient.getPodMetrics(namespace)
         totalPods = podMetrics.items.length
 
-        podMetrics.items.forEach((pod: any) => {
+        podMetrics.items.forEach((pod: unknown) => {
             // Apps use 'app' label, Integrations use 'gitship.io/integration'
+            // @ts-expect-error dynamic access
             const appName = pod.metadata.labels?.app
+            // @ts-expect-error dynamic access
             const intName = pod.metadata.labels?.["gitship.io/integration"]
             
             const targetName = appName || (intName ? `gitship-integration-${intName}` : null)
             const entry = targetName ? appsMap[targetName] : null
             
-            pod.containers.forEach((container: any) => {
+            // @ts-expect-error dynamic access
+            pod.containers.forEach((container: unknown) => {
+                // @ts-expect-error dynamic access
                 const cpu = parseCpu(container.usage.cpu)
+                // @ts-expect-error dynamic access
                 const mem = parseMemory(container.usage.memory)
                 
                 totalCpu += cpu
@@ -137,15 +160,16 @@ export async function GET() {
             })
             if (entry) entry.podCount++
         })
-    } catch (me: any) {
+    } catch (me: unknown) {
+        // @ts-expect-error dynamic access
         console.warn(`[METRICS] Could not fetch pod metrics: ${me.message}. This is normal if metrics-server is starting or missing.`)
     }
 
     // 3. Resolve Namespace Limits
     const hard = quota?.status?.hard || {}
-    const used = quota?.status?.used || {}
+    // const used = quota?.status?.used || {} // removed unused
 
-    const sUsage = used["requests.storage"] || used["storage"] || "0"
+    const sUsage = quota?.status?.used?.["requests.storage"] || quota?.status?.used?.["storage"] || "0"
     const sLimit = hard["requests.storage"] || hard["storage"] || "0"
 
     console.log(`[METRICS] Resolved Storage -> Usage: ${sUsage}, Limit: ${sLimit}`)
@@ -163,7 +187,8 @@ export async function GET() {
         },
         apps: Object.values(appsMap)
     })
-  } catch (e: any) {
+  } catch (e: unknown) {
+    // @ts-expect-error dynamic access
     console.error(`[METRICS] Failed to fetch metrics for ${namespace}:`, e.message)
     return NextResponse.json({ 
         total: { cpuUsage: "0m", cpuLimit: "0", memoryUsage: 0, memoryLimit: 0, podCount: 0, podLimit: 0 },

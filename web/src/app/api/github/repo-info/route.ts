@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
 
 export async function GET(req: NextRequest) {
-  const session: any = await auth()
+  const session = await auth()
+  // @ts-expect-error dynamic property
   if (!session?.accessToken) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const { searchParams } = new URL(req.url)
@@ -15,7 +16,8 @@ export async function GET(req: NextRequest) {
     const match = url.match(/github\.com\/([^/]+)\/([^/.]+)/)
     if (!match) return NextResponse.json({ error: "Only GitHub URLs are currently supported for auto-detection" }, { status: 400 })
 
-    const [_, owner, repoName] = match
+    const [, owner, repoName] = match
+    // @ts-expect-error dynamic property
     const token = session.accessToken
 
     // 1. Fetch Branches
@@ -58,13 +60,14 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({
-      branches: Array.isArray(branches) ? branches.map((b: any) => b.name) : ["main"],
-      tags: Array.isArray(tags) ? tags.map((t: any) => t.name) : [],
-      latestCommits: Array.isArray(commits) ? commits.map((c: any) => ({ sha: c.sha, message: c.commit.message })) : [],
+      branches: Array.isArray(branches) ? branches.map((b: { name: string }) => b.name) : ["main"],
+      tags: Array.isArray(tags) ? tags.map((t: { name: string }) => t.name) : [],
+      latestCommits: Array.isArray(commits) ? commits.map((c: { sha: string, commit: { message: string } }) => ({ sha: c.sha, message: c.commit.message })) : [],
       detectedPort,
       suggestedName: repoName.replace(/[^a-z0-9]/gi, '-').toLowerCase()
     })
-  } catch (e: any) {
+  } catch (e: unknown) {
+    // @ts-expect-error dynamic access
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }

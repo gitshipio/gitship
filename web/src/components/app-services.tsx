@@ -32,10 +32,7 @@ interface IngressInfo {
   paths: { path: string; service: string; port: number }[]
 }
 
-export function AppServices({ appName, namespace, serviceType, initialIngresses, initialPorts }: AppServicesProps) {
-  // GUARD
-  if (!appName || !namespace) return <div className="p-8 text-center text-muted-foreground italic">Networking info unavailable.</div>
-
+export function AppServices({ appName, namespace, initialIngresses, initialPorts }: AppServicesProps) {
   const [services, setServices] = useState<ServiceInfo[]>([])
   const [ingressesStatus, setIngressStatus] = useState<IngressInfo[]>([])
   const [loading, setLoading] = useState(true)
@@ -47,23 +44,24 @@ export function AppServices({ appName, namespace, serviceType, initialIngresses,
 
   const addPortMapping = () => setPorts([...ports, { name: "", port: 80, targetPort: 80, protocol: "TCP" }])
   const removePortMapping = (idx: number) => setPorts(ports.filter((_, i) => i !== idx))
-  const updatePortMapping = (idx: number, field: string, val: any) => {
+  const updatePortMapping = (idx: number, field: string, val: string | number) => {
     const updated = [...ports]
-    // @ts-ignore
+    // @ts-expect-error known dynamic access
     updated[idx][field] = val
     setPorts(updated)
   }
 
   const addIngressRule = () => setIngresses([...ingresses, { host: "", path: "/", servicePort: ports[0]?.port || 80, tls: false }])
   const removeIngressRule = (idx: number) => setIngresses(ingresses.filter((_, i) => i !== idx))
-  const updateIngressRule = (idx: number, field: string, val: any) => {
+  const updateIngressRule = (idx: number, field: string, val: string | number | boolean) => {
     const updated = [...ingresses]
-    // @ts-ignore
+    // @ts-expect-error known dynamic access
     updated[idx][field] = val
     setIngresses(updated)
   }
 
   const fetchNetworking = useCallback(async () => {
+    if (!appName || !namespace) return
     try {
       const res = await fetch(`/api/apps/${namespace}/${appName}/networking`)
       if (res.ok) {
@@ -82,6 +80,9 @@ export function AppServices({ appName, namespace, serviceType, initialIngresses,
     fetchNetworking()
   }, [fetchNetworking])
 
+  // GUARD
+  if (!appName || !namespace) return <div className="p-8 text-center text-muted-foreground italic">Networking info unavailable.</div>
+
   const handleSave = () => {
     startTransition(async () => {
         try {
@@ -89,12 +90,12 @@ export function AppServices({ appName, namespace, serviceType, initialIngresses,
                 spec: {
                     ports: ports.map(p => ({
                         ...p,
-                        port: parseInt(p.port as any) || 80,
-                        targetPort: parseInt(p.targetPort as any) || 80,
+                        port: Number(p.port) || 80,
+                        targetPort: Number(p.targetPort) || 80,
                     })),
                     ingresses: ingresses.map(ing => ({
                         ...ing,
-                        servicePort: parseInt(ing.servicePort as any) || 80,
+                        servicePort: Number(ing.servicePort) || 80,
                         tls: !!ing.tls
                     })),
                     // Set global TLS enabled if at least one ingress has it
@@ -114,7 +115,8 @@ export function AppServices({ appName, namespace, serviceType, initialIngresses,
             } else {
                 setMessage("Failed to save.")
             }
-        } catch (e: any) {
+        } catch (e: unknown) {
+            // @ts-expect-error dynamic access
             setMessage(`Error: ${e.message}`)
         }
     })
@@ -219,7 +221,7 @@ export function AppServices({ appName, namespace, serviceType, initialIngresses,
                         key={idx}
                         rule={ing}
                         availablePorts={ports}
-                        onUpdate={(field: string, val: any) => updateIngressRule(idx, field, val)}
+                        onUpdate={(field: string, val: string | number | boolean) => updateIngressRule(idx, field, val)}
                         onRemove={() => removeIngressRule(idx)}
                     />
                 ))}
@@ -286,7 +288,12 @@ export function AppServices({ appName, namespace, serviceType, initialIngresses,
   )
 }
 
-function IngressRuleRow({ rule, availablePorts, onUpdate, onRemove }: any) {
+function IngressRuleRow({ rule, availablePorts, onUpdate, onRemove }: {
+    rule: { host: string; path?: string; servicePort: number; tls?: boolean },
+    availablePorts: { name?: string; port: number }[],
+    onUpdate: (field: string, val: string | number | boolean) => void,
+    onRemove: () => void
+}) {
     const [advanced, setAdvanced] = useState(!!rule.path && rule.path !== "/")
 
     return (
@@ -308,9 +315,9 @@ function IngressRuleRow({ rule, availablePorts, onUpdate, onRemove }: any) {
                         <select
                             className="flex h-10 w-full rounded-md border-2 border-input bg-background px-3 py-2 text-xs appearance-none pr-8 font-bold outline-none"
                             value={rule.servicePort}
-                            onChange={(e) => onUpdate("servicePort", parseInt(e.target.value))}
+                            onChange={(e) => onUpdate("servicePort", Number(e.target.value))}
                         >
-                            {availablePorts.map((p: any, i: number) => (
+                            {availablePorts.map((p, i) => (
                                 <option key={i} value={p.port}>
                                     {p.name || `Port ${p.port}`} ({p.port})
                                 </option>

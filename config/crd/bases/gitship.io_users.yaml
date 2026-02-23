@@ -37,7 +37,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: UserSpec defines the desired state of User.
+            description: UserSpec defines the desired state of User
             properties:
               email:
                 description: Email contact for the user

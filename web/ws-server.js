@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 const { WebSocketServer } = require("ws")
 const k8s = require("@kubernetes/client-node")
 const { Stream } = require("stream")

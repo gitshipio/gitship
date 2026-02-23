@@ -8,11 +8,11 @@ import { UserMonitoring } from "@/components/user-monitoring"
 import { UserIntegrations } from "@/components/user-integrations"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { cn } from "@/lib/utils"
+import { GitshipApp } from "@/lib/types"
 import { Suspense } from "react"
 
 interface DashboardTabsProps {
-    apps: any[]
+    apps: GitshipApp[]
     hasApps: boolean
 }
 

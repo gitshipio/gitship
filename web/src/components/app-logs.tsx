@@ -55,12 +55,18 @@ export function AppLogs({ appName, namespace, history }: AppLogsProps) {
     }, [appName, namespace, tailLines, selectedPod, logType])
 
     useEffect(() => {
-        fetchLogs()
-        if (isFollowing && logType === "runtime") {
-            intervalRef.current = setInterval(fetchLogs, 3000)
-        }
-        return () => {
-            if (intervalRef.current) clearInterval(intervalRef.current)
+        if (logType === "runtime") {
+            // Defer to avoid synchronous setState in effect warning
+            const timer = setTimeout(() => {
+                void fetchLogs()
+            }, 0)
+            if (isFollowing) {
+                intervalRef.current = setInterval(fetchLogs, 3000)
+            }
+            return () => {
+                clearTimeout(timer)
+                if (intervalRef.current) clearInterval(intervalRef.current)
+            }
         }
     }, [fetchLogs, isFollowing, logType])
 
@@ -192,7 +198,7 @@ export function AppLogs({ appName, namespace, history }: AppLogsProps) {
                     >
                         {filteredLogs.length === 0 ? (
                             <div className="flex flex-col items-center justify-center h-full text-zinc-500 space-y-2">
-                                <Loader2 className="w-6 h-6 animate-spin opacity-20" />
+                                <LoaderSpinner className="w-6 h-6 animate-spin opacity-20" />
                                 <p className="italic">
                                     {logs.length === 0
                                         ? "Waiting for container logs..."
@@ -230,7 +236,7 @@ export function AppLogs({ appName, namespace, history }: AppLogsProps) {
     )
 }
 
-function Loader2(props: any) {
+function LoaderSpinner(props: React.SVGProps<SVGSVGElement>) {
     return (
         <svg
             {...props}

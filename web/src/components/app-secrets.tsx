@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Key, Plus, Trash2, Loader2, Eye, EyeOff } from "lucide-react"
+import { Key, Plus, Trash2, Loader2 } from "lucide-react"
 import { addSecret, loadSecrets, removeSecret } from "@/app/actions/secrets"
 import {
   Dialog,
@@ -23,8 +23,14 @@ interface AppSecretsProps {
     secretRefs?: string[]
 }
 
-export function AppSecrets({ appName, namespace, secretRefs }: AppSecretsProps) {
-    const [secrets, setSecrets] = useState<any[]>([])
+interface SecretInfo {
+    name: string
+    keys: string[]
+    created?: string
+}
+
+export function AppSecrets({ appName, namespace }: AppSecretsProps) {
+    const [secrets, setSecrets] = useState<SecretInfo[]>([])
     const [loading, setLoading] = useState(false)
     const [open, setOpen] = useState(false)
     

@@ -2,6 +2,8 @@
 
 import { k8sCoreApi, k8sNetworkingApi, k8sCustomApi } from "./k8s"
 
+import { GitshipUser } from "./types"
+
 const SYSTEM_NAMESPACE = process.env.SYSTEM_NAMESPACE || "gitship-system"
 const QUOTA_PODS = process.env.QUOTA_PODS || "20"
 const QUOTA_CPU_REQ = process.env.QUOTA_CPU_REQ || "4"
@@ -18,12 +20,12 @@ export async function ensureGitshipUser(username: string, githubID: number, emai
   const resourceName = `u-${githubID}`
   
   try {
-    const existing: any = await k8sCustomApi.getClusterCustomObject({
+    const existing = await k8sCustomApi.getClusterCustomObject({
         group: "gitship.io",
         version: "v1alpha1",
         plural: "gitshipusers",
         name: resourceName,
-    }).catch(() => null)
+    }).catch(() => null) as { body: GitshipUser } | null
 
     const body = {
         apiVersion: "gitship.io/v1alpha1",
@@ -38,28 +40,28 @@ export async function ensureGitshipUser(username: string, githubID: number, emai
           githubUsername: username,
           githubID: githubID,
           email: email,
-          role: existing ? existing.spec.role : "restricted",
-          quotas: existing ? existing.spec.quotas : undefined,
-          registries: existing ? existing.spec.registries : undefined,
+          role: existing ? existing.body.spec.role : "restricted",
+          quotas: existing ? existing.body.spec.quotas : undefined,
+          registries: existing ? existing.body.spec.registries : undefined,
         },
     }
 
     if (!existing) {
         // Migration logic: Check if a legacy record (username-based) exists
         const legacyName = username.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/^-|-$/g, "")
-        const legacy: any = await k8sCustomApi.getClusterCustomObject({
+        const legacy = await k8sCustomApi.getClusterCustomObject({
             group: "gitship.io",
             version: "v1alpha1",
             plural: "gitshipusers",
             name: legacyName,
-        }).catch(() => null)
+        }).catch(() => null) as { body: GitshipUser } | null
 
         // Migrate if ID matches OR if Username matches (for very old records)
-        if (legacy && (legacy.spec.githubID === githubID || legacy.spec.githubUsername?.toLowerCase() === username.toLowerCase())) {
+        if (legacy && (legacy.body.spec.githubID === githubID || legacy.body.spec.githubUsername?.toLowerCase() === username.toLowerCase())) {
             console.log(`[user] Migrating legacy user ${legacyName} to ${resourceName}`)
-            body.spec.role = legacy.spec.role
-            body.spec.quotas = legacy.spec.quotas
-            body.spec.registries = legacy.spec.registries
+            body.spec.role = legacy.body.spec.role
+            body.spec.quotas = legacy.body.spec.quotas
+            body.spec.registries = legacy.body.spec.registries
             
             // Clean up legacy record
             await k8sCustomApi.deleteClusterCustomObject({
@@ -79,18 +81,22 @@ export async function ensureGitshipUser(username: string, githubID: number, emai
         console.log(`[user] Created GitshipUser: ${resourceName} (@${username})`)
     } else {
         // Update username if it changed
-        if (existing.spec.githubUsername !== username) {
+        if (existing.body.spec.githubUsername !== username) {
             await k8sCustomApi.patchClusterCustomObject({
                 group: "gitship.io",
                 version: "v1alpha1",
                 plural: "gitshipusers",
                 name: resourceName,
                 body: { spec: { githubUsername: username } }
-            }, { headers: { "Content-Type": "application/merge-patch+json" } } as any)
+            }, { 
+                // @ts-expect-error custom headers
+                headers: { "Content-Type": "application/merge-patch+json" } 
+            })
             console.log(`[user] Updated username for ${resourceName}: ${username}`)
         }
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
+    // @ts-expect-error dynamic access
     console.error(`[user] Failed to ensure GitshipUser ${resourceName}:`, e.body?.message || e.message)
   }
   return resourceName
@@ -118,11 +124,13 @@ export async function ensureUserNamespace(userId: string): Promise<string> {
       },
     })
     console.log(`[namespace] Created namespace: ${namespace}`)
-  } catch (e: any) {
+  } catch (e: unknown) {
+    // @ts-expect-error dynamic access
     const code = e.body?.code || e.response?.statusCode
     if (code === 409) {
       return namespace
     }
+    // @ts-expect-error dynamic access
     console.error(`[namespace] Failed to create namespace ${namespace}:`, e.body?.message || e.message)
     return namespace
   }
@@ -165,9 +173,11 @@ export async function ensureUserNamespace(userId: string): Promise<string> {
       },
     })
     console.log(`[namespace] Applied NetworkPolicy to: ${namespace}`)
-  } catch (e: any) {
+  } catch (e: unknown) {
+    // @ts-expect-error dynamic access
     const code = e.body?.code || e.response?.statusCode
     if (code !== 409) {
+      // @ts-expect-error dynamic access
       console.error(`[namespace] Failed to create NetworkPolicy:`, e.body?.message || e.message)
     }
   }
@@ -193,9 +203,11 @@ export async function ensureUserNamespace(userId: string): Promise<string> {
       },
     })
     console.log(`[namespace] Applied ResourceQuota to: ${namespace}`)
-  } catch (e: any) {
+  } catch (e: unknown) {
+    // @ts-expect-error dynamic access
     const code = e.body?.code || e.response?.statusCode
     if (code !== 409) {
+      // @ts-expect-error dynamic access
       console.error(`[namespace] Failed to create ResourceQuota:`, e.body?.message || e.message)
     }
   }
@@ -227,18 +239,21 @@ export async function ensureGitHubSecret(namespace: string, token: string): Prom
     try {
       await k8sCoreApi.createNamespacedSecret({ namespace, body: secret })
       console.log(`[namespace] SUCCESS: Created GitHub token secret in ${namespace}`)
-    } catch (e: any) {
+    } catch (e: unknown) {
+      // @ts-expect-error dynamic access
       const code = e.body?.code || e.response?.statusCode
       if (code === 409) {
         // Update existing secret to keep token fresh
         await k8sCoreApi.replaceNamespacedSecret({ name: secretName, namespace, body: secret })
         console.log(`[namespace] SUCCESS: Updated GitHub token secret in ${namespace}`)
       } else {
+        // @ts-expect-error dynamic access
         console.error(`[namespace] ERROR: Failed to create secret:`, e.body?.message || e.message)
         throw e
       }
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
+    // @ts-expect-error dynamic access
     console.error(`[namespace] CRITICAL: Failed to sync GitHub secret in ${namespace}:`, e.body?.message || e.message)
   }
 }

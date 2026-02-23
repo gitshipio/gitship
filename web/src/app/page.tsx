@@ -1,10 +1,8 @@
 import { auth } from "@/auth"
-import { getGitshipApps, getUserQuotas } from "@/lib/api"
-import { AppGrid } from "@/components/app-grid"
+import { getGitshipApps } from "@/lib/api"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
-import { Plus, PackageOpen, LayoutGrid, Activity, ShieldAlert } from "lucide-react"
+import { Plus, ShieldAlert } from "lucide-react"
 import { ensureGitshipUser, ensureGitHubSecret } from "@/lib/namespace"
 import { RefreshTrigger } from "@/components/refresh-trigger"
 import { getUserRole, resolveUserSession } from "@/lib/auth-utils"
@@ -14,7 +12,6 @@ export const dynamic = 'force-dynamic'
 
 export default async function Home() {
   const session = await auth()
-  let quotas = null
   let role = "restricted"
 
   let userNamespace = ""
@@ -29,23 +26,23 @@ export default async function Home() {
 
     if (role !== "restricted") {
         // Sync GitHub token to the namespace for the operator to use
-        if ((session as any).accessToken) {
-            await ensureGitHubSecret(userNamespace, (session as any).accessToken)
+        // @ts-expect-error session properties are dynamic
+        if (session.accessToken) {
+            // @ts-expect-error session properties are dynamic
+            await ensureGitHubSecret(userNamespace, session.accessToken)
         }
-
-        quotas = await getUserQuotas(internalId)
     }
   }
 
   // Only fetch apps from the user's namespace to ensure multi-tenancy
   const appsList = (session && role !== "restricted") ? (await getGitshipApps(userNamespace)) : { items: [] }
-  const plainQuotas = quotas ? JSON.parse(JSON.stringify(quotas)) : null
-  const hasApps = appsList.items && appsList.items.length > 0
+  const hasApps = !!(appsList.items && appsList.items.length > 0)
 
   if (!session) {
     return (
       <div className="flex min-h-[calc(100vh-60px)] flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in duration-500">
         <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-3xl bg-muted/50 mb-8 border border-border/50 shadow-sm p-4">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo.svg" alt="Gitship Logo" className="w-full h-full object-contain" />
         </div>
         <h1 className="text-4xl font-extrabold tracking-tight lg:text-5xl mb-4 bg-gradient-to-r from-foreground to-foreground/60 bg-clip-text text-transparent">

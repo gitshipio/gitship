@@ -44,8 +44,9 @@ export function UserQuotaEditor({ username, currentQuotas }: UserQuotaEditorProp
             } else {
                 alert("Failed to update quotas")
             }
-        } catch (e: any) {
-            alert(e.message)
+        } catch (err: unknown) {
+            // @ts-expect-error dynamic access
+            alert(err.message)
         } finally {
             setLoading(false)
         }

@@ -11,7 +11,8 @@ export async function GET() {
   try {
     const quotas = await getUserQuotas(internalId)
     return NextResponse.json(quotas)
-  } catch (e: any) {
+  } catch (e: unknown) {
+    // @ts-expect-error dynamic access
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }

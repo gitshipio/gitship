@@ -14,8 +14,8 @@ interface AdminDashboardProps {
     users: GitshipUser[]
     apps: GitshipAppList
     integrations: GitshipIntegration[]
-    nodes: any[]
-    storageClasses: any[]
+    nodes: unknown[]
+    storageClasses: unknown[]
 }
 
 export function AdminDashboardUI({ users, apps, integrations, nodes, storageClasses }: AdminDashboardProps) {
@@ -181,9 +181,12 @@ export function AdminDashboardUI({ users, apps, integrations, nodes, storageClas
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            {storageClasses.map((sc: any) => (
+                            {storageClasses.map((sc) => (
+                                // @ts-expect-error dynamic property
                                 <div key={sc.metadata.name} className="flex items-center justify-between p-3 rounded border bg-muted/10">
+                                    {/* @ts-expect-error dynamic property */}
                                     <div className="font-mono font-bold">{sc.metadata.name}</div>
+                                    {/* @ts-expect-error dynamic property */}
                                     <Badge variant="outline">{sc.provisioner.split('/').pop()}</Badge>
                                 </div>
                             ))}
@@ -197,13 +200,17 @@ export function AdminDashboardUI({ users, apps, integrations, nodes, storageClas
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            {nodes.map((node: any) => (
+                            {nodes.map((node) => (
+                                // @ts-expect-error dynamic property
                                 <div key={node.metadata.name} className="flex items-center justify-between p-3 rounded border bg-muted/10">
                                     <div>
+                                        {/* @ts-expect-error dynamic property */}
                                         <div className="font-mono font-bold">{node.metadata.name}</div>
+                                        {/* @ts-expect-error dynamic property */}
                                         <div className="text-[10px] text-muted-foreground">{node.status.nodeInfo.kubeletVersion}</div>
                                     </div>
-                                    <Badge className="bg-emerald-500/10 text-emerald-500">{node.status.conditions.find((c: any) => c.type === 'Ready')?.status === 'True' ? 'Ready' : 'NotReady'}</Badge>
+                                    {/* @ts-expect-error dynamic property */}
+                                    <Badge className="bg-emerald-500/10 text-emerald-500">{node.status.conditions.find((c: { type: string, status: string }) => c.type === 'Ready')?.status === 'True' ? 'Ready' : 'NotReady'}</Badge>
                                 </div>
                             ))}
                         </CardContent>

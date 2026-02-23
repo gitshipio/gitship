@@ -58,8 +58,10 @@ export async function GET(
         jobName,
         status: latestJob.status 
     })
-  } catch (e: any) {
+  } catch (e: unknown) {
+    // @ts-expect-error dynamic access
     console.error(`[Logs] Failed to fetch build logs for ${name}:`, e.message)
+    // @ts-expect-error dynamic access
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }

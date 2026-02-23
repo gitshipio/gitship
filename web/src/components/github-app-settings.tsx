@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Github, ExternalLink, ShieldCheck, ShieldAlert, Lock, Globe, ChevronDown, ChevronUp, Plus } from "lucide-react"
+import { ExternalLink, ShieldAlert, Lock, Globe, ChevronDown, ChevronUp, Plus } from "lucide-react"
 import { GitHubRepo } from "@/lib/github"
 
 interface GitHubInstallation {
@@ -59,6 +59,7 @@ export function GitHubAppSettings({ installations }: GitHubAppSettingsProps) {
                         <CardHeader className="flex flex-row items-center justify-between pb-4 border-b bg-muted/5">
                             <div className="flex items-center gap-3">
                                 <div className="h-10 w-10 rounded-full overflow-hidden border">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img src={inst.account_avatar} alt={inst.account} className="h-full w-full object-cover" />
                                 </div>
                                 <div className="space-y-0.5">

@@ -9,9 +9,9 @@ export async function getAppSecrets(namespace: string, appName: string) {
         return secrets
             .filter(s => s.metadata?.labels?.["gitship.io/app"] === appName)
             .map(s => ({
-                name: s.metadata?.name,
+                name: s.metadata?.name || "unknown",
                 keys: Object.keys(s.data || {}),
-                created: s.metadata?.creationTimestamp
+                created: s.metadata?.creationTimestamp ? s.metadata.creationTimestamp.toISOString() : undefined
             }))
     } catch (e) {
         console.error("Failed to list secrets:", e)
@@ -45,24 +45,26 @@ export async function createSecret(namespace: string, appName: string, name: str
             }
         })
         return secretName
-    } catch (e: any) {
-        throw new Error(e.body?.message || e.message)
-    }
+  } catch (e: unknown) {
+    // @ts-expect-error dynamic access
+    throw new Error(e.body?.message || e.message)
+  }
 }
 
 export async function deleteSecret(namespace: string, name: string) {
-    try {
-        await k8sCoreApi.deleteNamespacedSecret({ name, namespace })
-    } catch (e: any) {
-        throw new Error(e.body?.message || e.message)
-    }
+  try {
+    await k8sCoreApi.deleteNamespacedSecret({ name, namespace })
+  } catch (e: unknown) {
+    // @ts-expect-error dynamic access
+    throw new Error(e.body?.message || e.message)
+  }
 }
 
 export async function bindSecretToApp(namespace: string, appName: string, secretName: string) {
     // Patch GitshipApp to add secretName to secretRefs
     try {
         // Fetch current
-        const res: any = await k8sCustomApi.getNamespacedCustomObject({
+        const res = await k8sCustomApi.getNamespacedCustomObject({
             group: "gitship.io",
             version: "v1alpha1",
             namespace,
@@ -82,17 +84,19 @@ export async function bindSecretToApp(namespace: string, appName: string, secret
                 name: appName,
                 body: [{ op: "replace", path: "/spec/secretRefs", value: refs }]
             }, {
+                // @ts-expect-error custom headers
                 headers: { "Content-Type": "application/json-patch+json" }
-            } as any)
+            })
         }
-    } catch (e: any) {
-        throw new Error(e.body?.message || e.message)
-    }
+  } catch (e: unknown) {
+    // @ts-expect-error dynamic access
+    throw new Error(e.body?.message || e.message)
+  }
 }
 
 export async function unbindSecretFromApp(namespace: string, appName: string, secretName: string) {
     try {
-        const res: any = await k8sCustomApi.getNamespacedCustomObject({
+        const res = await k8sCustomApi.getNamespacedCustomObject({
             group: "gitship.io",
             version: "v1alpha1",
             namespace,
@@ -110,11 +114,14 @@ export async function unbindSecretFromApp(namespace: string, appName: string, se
             namespace,
             plural: "gitshipapps",
             name: appName,
-            body: [{ op: "replace", path: "/spec/secretRefs", value: newRefs }]
-        }, {
-            headers: { "Content-Type": "application/json-patch+json" }
-        } as any)
-    } catch (e: any) {
-        throw new Error(e.body?.message || e.message)
-    }
+                            body: [{ op: "replace", path: "/spec/secretRefs", value: newRefs }]
+                        }, {
+                            // @ts-expect-error custom headers
+                            headers: { "Content-Type": "application/json-patch+json" }
+                        })
+            
+  } catch (e: unknown) {
+    // @ts-expect-error dynamic access
+    throw new Error(e.body?.message || e.message)
+  }
 }

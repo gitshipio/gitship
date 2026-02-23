@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useCallback, useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Cpu, MemoryStick, Box, Loader2, Zap, Database } from "lucide-react"
@@ -11,9 +11,11 @@ interface QuotaData {
     used: Record<string, string>
 }
 
-function UsageDetail({ label, used, hard, unit, icon: Icon, color, isCpu }: any) {
-    let usedNum = parseResourceValue(used)
-    let hardNum = parseResourceValue(hard)
+function UsageDetail({ label, used, hard, unit, icon: Icon, color, isCpu }: { 
+    label: string, used: string | number, hard: string | number, unit?: string, icon: React.ComponentType<{ className?: string }>, color: string, isCpu?: boolean 
+}) {
+    const usedNum = parseResourceValue(used)
+    const hardNum = parseResourceValue(hard)
     
     const percent = hardNum > 0 ? Math.min((usedNum / hardNum) * 100, 100) : 0
     const remaining = Math.max(0, hardNum - usedNum)
@@ -37,12 +39,12 @@ function UsageDetail({ label, used, hard, unit, icon: Icon, color, isCpu }: any)
                     </div>
                     <div>
                         <p className="text-[10px] font-black uppercase tracking-tighter opacity-40 leading-none mb-1">{label}</p>
-                        <p className="text-sm font-bold leading-none truncate max-w-[80px]" title={used}>{format(usedNum)} used</p>
+                        <p className="text-sm font-bold leading-none truncate max-w-[80px]" title={String(used)}>{format(usedNum)} used</p>
                     </div>
                 </div>
                 <div className="text-right">
                     <p className="text-[10px] font-black uppercase tracking-tighter opacity-40 leading-none mb-1">Limit</p>
-                    <p className="text-sm font-bold leading-none truncate max-w-[60px]" title={hard}>{format(hardNum)}</p>
+                    <p className="text-sm font-bold leading-none truncate max-w-[60px]" title={String(hard)}>{format(hardNum)}</p>
                 </div>
             </div>
             
@@ -70,26 +72,26 @@ export function ResourceUsage({ data: initialData, username }: { data?: QuotaDat
     const [data, setData] = useState<QuotaData | null>(initialData || null)
     const [loading, setLoading] = useState(!initialData)
 
-    useEffect(() => {
-        const fetchQuotas = async () => {
-            try {
-                const url = username ? `/api/admin/users/${username}/quotas` : "/api/user/quotas"
-                const res = await fetch(url, { cache: 'no-store' })
-                if (res.ok) {
-                    const json = await res.json()
-                    setData(json)
-                }
-            } catch (e) {
-                console.error("Failed to fetch quotas:", e)
-            } finally {
-                setLoading(false)
+    const fetchQuotas = useCallback(async () => {
+        try {
+            const url = username ? `/api/admin/users/${username}/quotas` : "/api/user/quotas"
+            const res = await fetch(url, { cache: 'no-store' })
+            if (res.ok) {
+                const json = await res.json()
+                setData(json)
             }
+        } catch (e) {
+            console.error("Failed to fetch quotas:", e)
+        } finally {
+            setLoading(false)
         }
-        
+    }, [username])
+
+    useEffect(() => {
         fetchQuotas()
         const interval = setInterval(fetchQuotas, 15000)
         return () => clearInterval(interval)
-    }, [])
+    }, [fetchQuotas])
 
     if (loading && !data) return (
         <div className="flex items-center gap-3 p-4 border-2 border-dashed rounded-2xl bg-muted/5 animate-pulse">

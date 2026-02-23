@@ -28,7 +28,7 @@ export async function getGitHubInstallation() {
     if (!instData.installations || instData.installations.length === 0) return null
 
     // 2. Fetch Repositories for ALL installations
-    const allInstallations = await Promise.all(instData.installations.map(async (inst: any) => {
+    const allInstallations = await Promise.all(instData.installations.map(async (inst: { id: number, account: { login: string, avatar_url: string }, repository_selection: string, html_url: string }) => {
         const repoRes = await fetch(`https://api.github.com/user/installations/${inst.id}/repositories`, {
             headers: { 
                 Authorization: `Bearer ${token}`,
@@ -81,7 +81,7 @@ export async function getUserRepositories(): Promise<GitHubRepo[]> {
     }
 
     // Fetch from all installations
-    const repoPromises = instData.installations.map(async (inst: any) => {
+    const repoPromises = instData.installations.map(async (inst: { id: number }) => {
         const res = await fetch(`https://api.github.com/user/installations/${inst.id}/repositories?per_page=100`, {
             headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github.v3+json" },
             cache: 'no-store'
@@ -96,7 +96,7 @@ export async function getUserRepositories(): Promise<GitHubRepo[]> {
     // Sort by updated_at
     return allRepos.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
   } catch (error) {
-    console.error("DEBUG: Error fetching repos:", error)
+    console.error("Error fetching repos:", error)
     return []
   }
 }
@@ -113,7 +113,7 @@ export async function createRepositoryWebhook(owner: string, repo: string, webho
     
     if (checkRes.ok) {
         const hooks = await checkRes.json()
-        const exists = hooks.some((h: any) => h.config.url === webhookUrl)
+        const exists = hooks.some((h: { config: { url: string } }) => h.config.url === webhookUrl)
         if (exists) {
             console.log(`[GitHub] Webhook already exists for ${owner}/${repo}`)
             return true
@@ -165,7 +165,7 @@ export async function addDeployKey(owner: string, repo: string, publicKey: strin
     
     if (checkRes.ok) {
         const keys = await checkRes.json()
-        const exists = keys.some((k: any) => k.key.trim() === publicKey.trim())
+        const exists = keys.some((k: { key: string }) => k.key.trim() === publicKey.trim())
         if (exists) {
             console.log(`[GitHub] Deploy key already exists for ${owner}/${repo}`)
             return true

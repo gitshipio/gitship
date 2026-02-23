@@ -46,6 +46,7 @@ export interface GitshipAppSpec {
   resources?: {
     cpu?: string;
     memory?: string;
+    storage?: string;
   };
   healthCheck?: {
     path?: string;
@@ -163,6 +164,7 @@ export interface GitshipIntegration {
         resources?: {
             cpu?: string;
             memory?: string;
+            storage?: string;
         };
         replicas?: number;
         enabled?: boolean;

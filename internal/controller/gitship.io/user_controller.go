@@ -37,8 +37,7 @@ type UserReconciler struct {
 // +kubebuilder:rbac:groups=gitship.io,resources=users/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=gitship.io,resources=users/finalizers,verbs=update
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
+// Reconcile User.
 func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = logf.FromContext(ctx)
 

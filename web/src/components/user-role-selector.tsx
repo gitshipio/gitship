@@ -29,8 +29,9 @@ export function UserRoleSelector({ username, currentRole }: { username: string, 
             } else {
                 alert("Failed to update role")
             }
-        } catch (e: any) {
-            alert(e.message)
+        } catch (err: unknown) {
+            // @ts-expect-error dynamic access
+            alert(err.message)
         } finally {
             setLoading(false)
         }

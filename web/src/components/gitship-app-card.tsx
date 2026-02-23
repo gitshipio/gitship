@@ -1,4 +1,3 @@
-
 import {
   Card,
   CardContent,
@@ -6,9 +5,8 @@ import {
   CardHeader,
 } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { GitshipApp } from "@/lib/types"
-import { ExternalLink, GitBranch, Github, Activity, ArrowRight, AlertCircle, Loader2, Tag, Hash } from "lucide-react"
+import { GitBranch, Github, Activity, ArrowRight, AlertCircle, Loader2, Tag, Hash } from "lucide-react"
 import Link from "next/link"
 
 function timeAgo(dateStr?: string): string {

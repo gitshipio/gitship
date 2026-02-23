@@ -16,16 +16,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { 
-    Shield, 
     Settings2, 
     User as UserIcon, 
     Github, 
     Cpu, 
     Database, 
     Layout, 
-    Loader2,
-    CheckCircle2,
-    AlertCircle
+    Loader2
 } from "lucide-react"
 import { GitshipUser } from "@/lib/types"
 
@@ -68,7 +65,8 @@ export function UserManagementSheet({ user }: UserManagementSheetProps) {
             } else {
                 alert("Failed to update some settings")
             }
-        } catch (e: any) {
+        } catch (e: unknown) {
+            // @ts-expect-error dynamic access
             alert(e.message)
         } finally {
             setLoading(false)

@@ -42,6 +42,7 @@ export default function RootLayout({
             <div className="container flex h-14 items-center px-4 md:px-8 max-w-screen-2xl mx-auto">
               <div className="mr-4 flex">
                 <Link href="/" className="mr-6 flex items-center space-x-2.5">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src="/logo.svg" alt="Gitship Logo" className="h-7 w-7" />
                   <span className="font-bold inline-block text-lg">
                     Gitship

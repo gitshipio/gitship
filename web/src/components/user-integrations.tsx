@@ -4,13 +4,13 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Trash2, ExternalLink, Cloud, ShieldCheck, Loader2, Settings2, AlertCircle } from "lucide-react"
+import { Trash2, Cloud, Loader2, Settings2, AlertCircle } from "lucide-react"
 import { GitshipIntegration } from "@/lib/types"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { cn, stripUnits, parseResourceValue } from "@/lib/utils"
+import { cn, stripUnits } from "@/lib/utils"
 
 export function UserIntegrations() {
     const [integrations, setIntegrations] = useState<GitshipIntegration[]>([])
@@ -32,7 +32,7 @@ export function UserIntegrations() {
                 const data = await res.json()
                 setIntegrations(data)
             }
-        } catch (e) {
+        } catch {
             console.error("Failed to fetch integrations")
         } finally {
             setLoading(false)
@@ -71,8 +71,8 @@ export function UserIntegrations() {
                 const data = await res.json()
                 setError(data.error || "Failed to install integration")
             }
-        } catch (e: any) {
-            setError(e.message || "An unexpected error occurred")
+        } catch {
+            setError("An unexpected error occurred")
         } finally {
             setInstalling(false)
         }
@@ -106,8 +106,8 @@ export function UserIntegrations() {
                 const data = await res.json()
                 setError(data.error || "Failed to update integration")
             }
-        } catch (e: any) {
-            setError(e.message || "An unexpected error occurred")
+        } catch {
+            setError("An unexpected error occurred")
         } finally {
             setInstalling(false)
         }
@@ -122,7 +122,7 @@ export function UserIntegrations() {
             if (res.ok) {
                 await fetchIntegrations()
             }
-        } catch (e) {
+        } catch {
             console.error("Failed to delete integration")
         } finally {
             setDeleting(null)

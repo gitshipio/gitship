@@ -40,6 +40,7 @@ export default async function SettingsPage() {
             <div className="flex items-center gap-4 pb-6 border-b border-border/40">
                 <div className="h-16 w-16 rounded-full overflow-hidden border-2 border-border shadow-sm shrink-0">
                     {session.user.image ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
                         <img src={session.user.image} alt={username} className="h-full w-full object-cover" />
                     ) : (
                         <div className="h-full w-full bg-muted flex items-center justify-center text-xl font-bold">

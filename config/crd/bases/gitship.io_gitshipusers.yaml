@@ -37,7 +37,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: GitshipUserSpec defines the desired state of GitshipUser.
+            description: GitshipUserSpec defines the desired state of GitshipUser
             properties:
               email:
                 description: Email for Let's Encrypt notifications and Issuer registration

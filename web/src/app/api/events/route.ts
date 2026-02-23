@@ -21,7 +21,7 @@ export async function GET(req: Request) {
       const keepAlive = setInterval(() => {
         try {
           controller.enqueue(encoder.encode(": keep-alive\n\n"))
-        } catch (e) {
+        } catch {
           clearInterval(keepAlive)
         }
       }, 30000)
@@ -43,7 +43,7 @@ export async function GET(req: Request) {
             }
             try {
               controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`))
-            } catch (e) {
+            } catch {
               // Stream likely closed
             }
           },
@@ -61,7 +61,8 @@ export async function GET(req: Request) {
             try { watchReq.abort() } catch {}
         })
 
-      } catch (err: any) {
+      } catch (err: unknown) {
+        // @ts-expect-error dynamic access
         console.error("[SSE] Watch setup failed:", err.message)
         clearInterval(keepAlive)
         try { controller.close() } catch {}

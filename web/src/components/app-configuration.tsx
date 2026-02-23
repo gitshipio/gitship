@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Trash2, Plus, Save, RotateCcw, Database, Clock, Lock, GitBranch, Tag, Hash, ChevronDown, Key, Loader2, CheckCircle2, Search, Check, AlertCircle, Activity } from "lucide-react"
+import { Trash2, Plus, Save, Database, GitBranch, Tag, Hash, ChevronDown, Key, Loader2, CheckCircle2, Check, Activity } from "lucide-react"
 import { cn, stripUnits } from "@/lib/utils"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { AppSecrets } from "./app-secrets"
@@ -38,8 +38,6 @@ interface AppConfigurationProps {
 export function AppConfiguration({ appName, namespace, spec }: AppConfigurationProps) {
     const router = useRouter()
     
-    if (!spec) return <div className="p-8 text-center text-muted-foreground italic">Configuration temporarily unavailable.</div>
-
     const [replicas, setReplicas] = useState(spec?.replicas ?? 1)
     const [cpu, setCpu] = useState(stripUnits(spec?.resources?.cpu, 'cpu'))
     const [memory, setMemory] = useState(stripUnits(spec?.resources?.memory, 'mem'))
@@ -79,7 +77,7 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
 
     useEffect(() => {
         const fetchRepoInfo = async () => {
-            if (!spec.repoUrl) return
+            if (!spec?.repoUrl) return
             setIsSearching(true)
             try {
                 const res = await fetch(`/api/github/repo-info?url=${encodeURIComponent(spec.repoUrl)}`)
@@ -96,7 +94,7 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
             }
         }
         fetchRepoInfo()
-    }, [spec.repoUrl])
+    }, [spec?.repoUrl])
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -121,7 +119,7 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
         )
     }, [sourceType, branches, tags, commits, searchQuery])
 
-    // 2. Proper Side-Effect handling for SSH Check
+    // Proper Side-Effect handling for SSH Check
     useEffect(() => {
         let isMounted = true
         if (!namespace || !appName) return
@@ -134,13 +132,15 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
                 if (isMounted && data?.exists) {
                     setAuthMethod("ssh")
                 }
-            } catch (err) {
+            } catch {
                 // Ignore background errors
             }
         }
         checkSSH()
         return () => { isMounted = false }
     }, [namespace, appName])
+
+    if (!spec) return <div className="p-8 text-center text-muted-foreground italic">Configuration temporarily unavailable.</div>
 
     const addEnvVar = () => setEnvVars([...envVars, { key: "", value: "" }])
     const removeEnvVar = (idx: number) => setEnvVars(envVars.filter((_, i) => i !== idx))
@@ -154,7 +154,7 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
     const removeSecretMount = (idx: number) => setSecretMounts(secretMounts.filter((_, i) => i !== idx))
     const updateSecretMount = (idx: number, field: string, val: string) => {
         const updated = [...secretMounts]
-        // @ts-ignore
+        // @ts-expect-error known dynamic access
         updated[idx][field] = val
         setSecretMounts(updated)
     }
@@ -163,7 +163,7 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
     const removeVolume = (idx: number) => setVolumes(volumes.filter((_, i) => i !== idx))
     const updateVolume = (idx: number, field: string, val: string) => {
         const updated = [...volumes]
-        // @ts-ignore
+        // @ts-expect-error known dynamic access
         updated[idx][field] = val
         setVolumes(updated)
     }
@@ -184,7 +184,8 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
                 setAuthMethod("ssh")
                 router.refresh()
             }
-        } catch (e: any) {
+        } catch (e: unknown) {
+            // @ts-expect-error dynamic access
             setMessage(`Error: ${e.message}`)
         } finally {
             setSetupLoading(false)
@@ -239,7 +240,8 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
                     const data = await res.json()
                     setMessage(`Error: ${data.error || "Failed to save"}`)
                 }
-            } catch (e: any) {
+            } catch (e: unknown) {
+                // @ts-expect-error dynamic access
                 setMessage(`Error: ${e.message}`)
             }
         })
@@ -310,7 +312,7 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
                                         className="flex h-11 w-full items-center justify-between rounded-md border-2 border-input bg-background px-3 py-2 text-xs appearance-none pr-8 font-bold"
                                         value={sourceType}
                                         onChange={e => {
-                                            setSourceType(e.target.value as any)
+                                            setSourceType(e.target.value as "branch" | "tag" | "commit")
                                             setSearchValue("")
                                         }}
                                     >

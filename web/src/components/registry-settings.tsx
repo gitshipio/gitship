@@ -59,8 +59,9 @@ export function RegistrySettings({ registries = [] }: { registries?: RegistryCon
                 const data = await res.json()
                 setError(data.error || "Failed to add registry")
             }
-        } catch (e: any) {
-            setError(e.message)
+        } catch (err: unknown) {
+            // @ts-expect-error dynamic access
+            setError(err.message)
         } finally {
             setLoading(false)
         }
@@ -81,8 +82,9 @@ export function RegistrySettings({ registries = [] }: { registries?: RegistryCon
                 setRegistryToDelete(null)
                 router.refresh()
             }
-        } catch (e: any) {
-            alert(e.message)
+        } catch (err: unknown) {
+            // @ts-expect-error dynamic access
+            alert(err.message)
         } finally {
             setLoading(false)
         }

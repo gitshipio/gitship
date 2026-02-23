@@ -20,7 +20,7 @@ export async function GET(
   try {
     await k8sCoreApi.readNamespacedSecret({ name: secretName, namespace })
     return NextResponse.json({ exists: true })
-  } catch (e) {
+  } catch {
     return NextResponse.json({ exists: false })
   }
 }

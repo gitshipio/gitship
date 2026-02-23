@@ -6,7 +6,6 @@ import { revalidatePath } from "next/cache"
 import { generateSSHKeyPair } from "@/lib/ssh"
 import { addDeployKey } from "@/lib/github"
 import { k8sCustomApi, k8sCoreApi } from "@/lib/k8s"
-import { GitshipApp } from "@/lib/types"
 
 export async function loadSecrets(namespace: string, appName: string) {
     const session = await auth()
@@ -23,22 +22,27 @@ export async function addSecret(namespace: string, appName: string, name: string
         await bindSecretToApp(namespace, appName, secretName)
         revalidatePath(`/app/${namespace}/${appName}`)
         return { success: true }
-    } catch (e: any) {
+    } catch (e: unknown) {
+        // @ts-expect-error dynamic access
         return { error: e.message }
     }
 }
 
 export async function setupAppSSH(namespace: string, appName: string, repoUrl: string) {
     const session = await auth()
-    const token = (session as any)?.accessToken
+    // @ts-expect-error dynamic property
+    const token = session?.accessToken
     if (!token) return { error: "No GitHub token found in session. Please re-login." }
 
     try {
         // 1. Cleanup existing secret to avoid conflicts/mismatch
         const secretName = `${appName}-ssh-key`
         try {
+            await k8sCoreApi.readNamespacedSecret({ name: secretName, namespace })
             await k8sCoreApi.deleteNamespacedSecret({ name: secretName, namespace })
-        } catch {}
+        } catch {
+            // Secret likely doesn't exist, ignore
+        }
 
         const { privateKey, publicKey } = await generateSSHKeyPair(`gitship-${appName}`)
         
@@ -66,8 +70,9 @@ export async function setupAppSSH(namespace: string, appName: string, repoUrl: s
             name: appName,
             body: patch
         }, {
+            // @ts-expect-error custom headers for JSON Patch
             headers: { "Content-Type": "application/json-patch+json" }
-        } as any)
+        })
 
         revalidatePath(`/app/${namespace}/${appName}`)
         
@@ -76,7 +81,8 @@ export async function setupAppSSH(namespace: string, appName: string, repoUrl: s
             autoAdded: added,
             publicKey: publicKey 
         }
-    } catch (e: any) {
+    } catch (e: unknown) {
+        // @ts-expect-error dynamic access
         return { error: e.message }
     }
 }
@@ -90,7 +96,8 @@ export async function removeSecret(namespace: string, appName: string, secretNam
         await deleteSecret(namespace, secretName)
         revalidatePath(`/app/${namespace}/${appName}`)
         return { success: true }
-    } catch (e: any) {
+    } catch (e: unknown) {
+        // @ts-expect-error dynamic access
         return { error: e.message }
     }
 }

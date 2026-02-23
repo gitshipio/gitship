@@ -18,11 +18,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     jwt({ token, account, profile }) {
       if (account) {
         token.accessToken = account.access_token
-        // @ts-ignore login exists on github profile
+        // @ts-expect-error login exists on github profile
         token.githubUsername = profile?.login?.toLowerCase()
-        // @ts-ignore id exists on github profile
         token.githubId = profile?.id?.toString()
-        // @ts-ignore email exists on github profile
         token.email = profile?.email
       }
       return token

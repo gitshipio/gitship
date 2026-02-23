@@ -93,57 +93,12 @@ func (r *GitshipAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	// 1. Try SSH Key
-	privateKey := ""
-	sshSecret := &corev1.Secret{}
-	sshSecretName := fmt.Sprintf("%s-ssh-key", gitshipApp.Name)
-	if err := r.Get(ctx, types.NamespacedName{Name: sshSecretName, Namespace: gitshipApp.Namespace}, sshSecret); err == nil {
-		privateKey = string(sshSecret.Data["ssh-privatekey"])
-		log.Info("DEBUG: Found SSH key secret", "secret", sshSecretName)
-	} else {
-		log.Info("DEBUG: SSH key secret not found", "secret", sshSecretName, "error", err)
+	latestCommit, privateKey, _, result := r.resolveAuthAndCommit(ctx, gitshipApp)
+	if result != nil {
+		return *result, nil
 	}
 
-	// 2. Try GitHub Token
-	githubToken := ""
-	tokenSecret := &corev1.Secret{}
-	if err := r.Get(ctx, types.NamespacedName{Name: "gitship-github-token", Namespace: gitshipApp.Namespace}, tokenSecret); err == nil {
-		githubToken = string(tokenSecret.Data["token"])
-	}
-
-	// Resolve latest commit using 3-step strategy: SSH -> Token -> Anon
-	repoURL := gitshipApp.Spec.RepoURL
-	source := gitshipApp.Spec.Source
-
-	latestCommit, err := resolveLatestCommit(repoURL, source, privateKey, githubToken)
-	if err != nil {
-		log.Error(err, "Failed to resolve latest commit", "repo", repoURL)
-
-		// If it's an auth error, mark as AuthError phase
-		errMsg := strings.ToLower(err.Error())
-		if strings.Contains(errMsg, "auth") || strings.Contains(errMsg, "unauthorized") {
-			gitshipApp.Status.Phase = "AuthError"
-			_ = r.Status().Update(ctx, gitshipApp)
-			return ctrl.Result{RequeueAfter: 5 * time.Minute}, nil
-		}
-
-		if gitshipApp.Status.Phase == "Building" {
-			gitshipApp.Status.Phase = "Failed"
-			_ = r.Status().Update(ctx, gitshipApp)
-		}
-		return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
-	}
-
-	// SUCCESS: Clear AuthError if it was set
-	if gitshipApp.Status.Phase == "AuthError" {
-		log.Info("Connection successful, clearing AuthError")
-		gitshipApp.Status.Phase = phaseRunning
-		if err := r.Status().Update(ctx, gitshipApp); err != nil {
-			log.Error(err, "Failed to clear AuthError status")
-		}
-	}
-
-	log.Info("Resolved latest commit", "commit", latestCommit, "source", source.Type, "value", source.Value)
+	log.Info("Resolved latest commit", "commit", latestCommit, "source", gitshipApp.Spec.Source.Type, "value", gitshipApp.Spec.Source.Value)
 
 	if gitshipApp.Status.LatestBuildID == latestCommit {
 		// 0. Resolve Image
@@ -170,64 +125,8 @@ func (r *GitshipAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			return ctrl.Result{}, err
 		}
 
-		// Update Status
-		dep := &appsv1.Deployment{}
-		_ = r.Get(ctx, types.NamespacedName{Name: gitshipApp.Name, Namespace: gitshipApp.Namespace}, dep)
-
-		statusChanged := false
-		if gitshipApp.Status.DesiredReplicas != replicas || gitshipApp.Status.ReadyReplicas != dep.Status.ReadyReplicas {
-			gitshipApp.Status.DesiredReplicas = replicas
-			gitshipApp.Status.ReadyReplicas = dep.Status.ReadyReplicas
-			statusChanged = true
-		}
-
-		if dep.Status.ReadyReplicas > 0 && dep.Status.ReadyReplicas >= replicas {
-			if gitshipApp.Status.Phase != phaseRunning {
-				gitshipApp.Status.Phase = phaseRunning
-				gitshipApp.Status.LastDeployedAt = metav1.Now().Format(time.RFC3339)
-				statusChanged = true
-			}
-		}
-
-		// Calculate AppURL based on Ingress
-		newAppURL := ""
-		if len(gitshipApp.Spec.Ingresses) > 0 {
-			proto := "http"
-			if gitshipApp.Spec.Ingresses[0].TLS {
-				proto = "https"
-			}
-			newAppURL = fmt.Sprintf("%s://%s", proto, gitshipApp.Spec.Ingresses[0].Host)
-		}
-
-		if gitshipApp.Status.AppURL != newAppURL {
-			gitshipApp.Status.AppURL = newAppURL
-			statusChanged = true
-		}
-
-		// Cleanup: Force clear if it still contains internal domain (fallback)
-		if strings.Contains(gitshipApp.Status.AppURL, ".svc.cluster.local") {
-			gitshipApp.Status.AppURL = ""
-			statusChanged = true
-		}
-
-		podList := &corev1.PodList{}
-		if err := r.List(ctx, podList, client.InNamespace(gitshipApp.Namespace), client.MatchingLabels{"app": gitshipApp.Name}); err == nil {
-			var totalRestarts int32
-			for _, pod := range podList.Items {
-				for _, cs := range pod.Status.ContainerStatuses {
-					totalRestarts += cs.RestartCount
-				}
-			}
-			if gitshipApp.Status.RestartCount != totalRestarts {
-				gitshipApp.Status.RestartCount = totalRestarts
-				statusChanged = true
-			}
-		}
-
-		if statusChanged {
-			if err := r.Status().Update(ctx, gitshipApp); err != nil {
-				log.V(1).Info("Failed to update status", "error", err)
-			}
+		if err := r.updateAppStatus(ctx, gitshipApp, replicas); err != nil {
+			return ctrl.Result{}, err
 		}
 
 		requeueAfter := 5 * time.Minute
@@ -246,126 +145,13 @@ func (r *GitshipAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	jobName := fmt.Sprintf("%s-build-%s", gitshipApp.Name, latestCommit[:7])
 	job := &batchv1.Job{}
-	err = r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: gitshipApp.Namespace}, job)
+	err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: gitshipApp.Namespace}, job)
 	if err != nil && client.IgnoreNotFound(err) != nil {
 		return ctrl.Result{}, err
 	}
 
 	if err != nil {
-		gitshipApp.Status.Phase = "Building"
-		gitshipApp.Status.LatestBuildID = latestCommit
-		if err := r.Status().Update(ctx, gitshipApp); err != nil {
-			return ctrl.Result{}, err
-		}
-
-		pushImage, _ := r.resolveImageNames(gitshipApp, latestCommit)
-
-		// Use the same repository for caching, or a subpath
-		cacheRepo := strings.Split(pushImage, ":")[0] + "-cache"
-
-		kanikoArgs := []string{
-			"--dockerfile=Dockerfile",
-			"--context=dir:///workspace",
-			"--destination=" + pushImage,
-			"--cache=true",
-			"--cache-repo=" + cacheRepo,
-		}
-
-		volumeMounts := []corev1.VolumeMount{{Name: "workspace", MountPath: "/workspace"}}
-		volumes := []corev1.Volume{{Name: "workspace", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}}}
-
-		var initEnv []corev1.EnvVar
-		if err := r.Get(ctx, types.NamespacedName{Name: "gitship-github-token", Namespace: gitshipApp.Namespace}, &corev1.Secret{}); err == nil {
-			initEnv = append(initEnv, corev1.EnvVar{
-				Name: "GITHUB_TOKEN",
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{Name: "gitship-github-token"},
-						Key:                  "token",
-					},
-				},
-			})
-		}
-
-		gitCloneCmd := `
-			if [ -n "$GITHUB_TOKEN" ]; then 
-				REPO_URL=$(echo $REPO_URL | sed "s/https:\/\//https:\/\/oauth2:$GITHUB_TOKEN@/"); 
-			fi; 
-			git clone $REPO_URL /workspace && cd /workspace && git checkout $COMMIT_ID
-		`
-
-		sshSecretName := fmt.Sprintf("%s-ssh-key", gitshipApp.Name)
-		if err := r.Get(ctx, types.NamespacedName{Name: sshSecretName, Namespace: gitshipApp.Namespace}, &corev1.Secret{}); err == nil {
-			sshUrl := gitshipApp.Spec.RepoURL
-			if strings.HasPrefix(sshUrl, "https://github.com/") {
-				sshUrl = strings.Replace(sshUrl, "https://github.com/", "git@github.com:", 1)
-			}
-
-			volumeMounts = append(volumeMounts, corev1.VolumeMount{Name: "ssh-key", MountPath: "/etc/ssh-key", ReadOnly: true})
-			volumes = append(volumes, corev1.Volume{
-				Name: "ssh-key",
-				VolumeSource: corev1.VolumeSource{
-					Secret: &corev1.SecretVolumeSource{
-						SecretName:  sshSecretName,
-						DefaultMode: func(i int32) *int32 { return &i }(0400),
-					},
-				},
-			})
-
-			gitCloneCmd = fmt.Sprintf(`
-				mkdir -p /root/.ssh && 
-				cp /etc/ssh-key/ssh-privatekey /root/.ssh/id_rsa && 
-				chmod 600 /root/.ssh/id_rsa && 
-				export GIT_SSH_COMMAND="ssh -i /root/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" && 
-				if git clone %s /workspace; then 
-					cd /workspace && git checkout $COMMIT_ID; 
-				else 
-					if [ -n "$GITHUB_TOKEN" ]; then 
-						REPO_URL=$(echo $REPO_URL | sed "s/https:\/\//https:\/\/oauth2:$GITHUB_TOKEN@/"); 
-					fi; 
-					git clone $REPO_URL /workspace && cd /workspace && git checkout $COMMIT_ID; 
-				fi
-			`, sshUrl)
-		}
-
-		buildResources := resolveResources(gitshipApp.Spec.Resources)
-
-		newJob := &batchv1.Job{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      jobName,
-				Namespace: gitshipApp.Namespace,
-				Labels:    map[string]string{"gitship.io/app": gitshipApp.Name, "gitship.io/commit": latestCommit},
-			},
-			Spec: batchv1.JobSpec{
-				BackoffLimit:            func(i int32) *int32 { return &i }(1),
-				TTLSecondsAfterFinished: func(i int32) *int32 { return &i }(3600),
-				ActiveDeadlineSeconds:   func(i int64) *int64 { return &i }(3600),
-				Template: corev1.PodTemplateSpec{
-					Spec: corev1.PodSpec{
-						RestartPolicy: corev1.RestartPolicyNever,
-						InitContainers: []corev1.Container{{
-							Name: "git-clone", Image: r.Config.ImageGit,
-							Command: []string{"/bin/sh", "-c", gitCloneCmd},
-							Env: append([]corev1.EnvVar{
-								{Name: "REPO_URL", Value: gitshipApp.Spec.RepoURL},
-								{Name: "COMMIT_ID", Value: latestCommit},
-							}, initEnv...),
-							VolumeMounts: volumeMounts, Resources: buildResources,
-						}},
-						Containers: []corev1.Container{{
-							Name: "kaniko", Image: r.Config.ImageKaniko,
-							Args: kanikoArgs, VolumeMounts: volumeMounts, Resources: buildResources,
-						}},
-						Volumes: volumes,
-					},
-				},
-			},
-		}
-
-		if err := ctrl.SetControllerReference(gitshipApp, newJob, r.Scheme); err != nil {
-			return ctrl.Result{}, err
-		}
-		if err := r.Create(ctx, newJob); err != nil {
+		if err := r.ensureBuildJob(ctx, gitshipApp, jobName, latestCommit, privateKey); err != nil {
 			return ctrl.Result{}, err
 		}
 	} else if job.Status.Succeeded > 0 {
@@ -383,7 +169,7 @@ func (r *GitshipAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 }
 
 func (r *GitshipAppReconciler) ensureService(ctx context.Context, gitshipApp *gitshipiov1alpha1.GitshipApp) error {
-	var svcPorts []corev1.ServicePort
+	svcPorts := make([]corev1.ServicePort, 0, len(gitshipApp.Spec.Ports))
 	for _, p := range gitshipApp.Spec.Ports {
 		name := p.Name
 		if name == "" {
@@ -468,7 +254,7 @@ func (r *GitshipAppReconciler) ensureIngress(ctx context.Context, gitshipApp *gi
 		"kubernetes.io/ingress.class": ingressClassName,
 	}
 
-	var rules []networkingv1.IngressRule
+	rules := make([]networkingv1.IngressRule, 0, len(gitshipApp.Spec.Ingresses))
 	var tls []networkingv1.IngressTLS
 	anyTlsEnabled := false
 
@@ -513,7 +299,7 @@ func (r *GitshipAppReconciler) ensureIngress(ctx context.Context, gitshipApp *gi
 		// Check if local Issuer exists (created by User Controller)
 		localIssuer := &cmv1.Issuer{}
 		err := r.Get(ctx, types.NamespacedName{Name: "letsencrypt-prod", Namespace: gitshipApp.Namespace}, localIssuer)
-		
+
 		if err == nil {
 			// Local issuer exists -> Use it
 			annotations["cert-manager.io/issuer"] = "letsencrypt-prod"
@@ -559,12 +345,12 @@ func (r *GitshipAppReconciler) ensureDeployment(ctx context.Context, gitshipApp 
 		return err
 	}
 
-	var envVars []corev1.EnvVar
+	envVars := make([]corev1.EnvVar, 0, len(gitshipApp.Spec.Env))
 	for k, v := range gitshipApp.Spec.Env {
 		envVars = append(envVars, corev1.EnvVar{Name: k, Value: v})
 	}
 
-	var envFrom []corev1.EnvFromSource
+	envFrom := make([]corev1.EnvFromSource, 0, len(gitshipApp.Spec.SecretRefs))
 	for _, secretName := range gitshipApp.Spec.SecretRefs {
 		envFrom = append(envFrom, corev1.EnvFromSource{
 			SecretRef: &corev1.SecretEnvSource{
@@ -573,59 +359,7 @@ func (r *GitshipAppReconciler) ensureDeployment(ctx context.Context, gitshipApp 
 		})
 	}
 
-	var volumes []corev1.Volume
-	var volumeMounts []corev1.VolumeMount
-
-	// 1. Persistent Volumes
-	for _, v := range gitshipApp.Spec.Volumes {
-		pvcName := fmt.Sprintf("%s-%s", gitshipApp.Name, v.Name)
-		volumeMounts = append(volumeMounts, corev1.VolumeMount{
-			Name:      v.Name,
-			MountPath: v.MountPath,
-		})
-		volumes = append(volumes, corev1.Volume{
-			Name: v.Name,
-			VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: pvcName,
-				},
-			},
-		})
-	}
-
-	// 2. Secret Mounts (Files)
-	for i, sm := range gitshipApp.Spec.SecretMounts {
-		volName := fmt.Sprintf("secret-%d", i)
-		volumeMounts = append(volumeMounts, corev1.VolumeMount{
-			Name:      volName,
-			MountPath: sm.MountPath,
-			ReadOnly:  true,
-		})
-		volumes = append(volumes, corev1.Volume{
-			Name: volName,
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: sm.SecretName,
-				},
-			},
-		})
-	}
-
-	// 3. Common Temp Mounts (for non-root support)
-	tempDirs := []string{"/tmp", "/var/cache/nginx", "/var/run"}
-	for i, dir := range tempDirs {
-		name := fmt.Sprintf("tmp-%d", i)
-		volumeMounts = append(volumeMounts, corev1.VolumeMount{
-			Name:      name,
-			MountPath: dir,
-		})
-		volumes = append(volumes, corev1.Volume{
-			Name: name,
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
-			},
-		})
-	}
+	volumes, volumeMounts := r.generatePodVolumes(gitshipApp)
 
 	appResources := resolveResources(gitshipApp.Spec.Resources)
 
@@ -841,6 +575,293 @@ func (r *GitshipAppReconciler) ensureVolumes(ctx context.Context, gitshipApp *gi
 	return nil
 }
 
+func (r *GitshipAppReconciler) generatePodVolumes(gitshipApp *gitshipiov1alpha1.GitshipApp) ([]corev1.Volume, []corev1.VolumeMount) {
+	volumes := make([]corev1.Volume, 0, len(gitshipApp.Spec.Volumes)+len(gitshipApp.Spec.SecretMounts)+3)
+	volumeMounts := make([]corev1.VolumeMount, 0, len(gitshipApp.Spec.Volumes)+len(gitshipApp.Spec.SecretMounts)+3)
+
+	// 1. Persistent Volumes
+	for _, v := range gitshipApp.Spec.Volumes {
+		pvcName := fmt.Sprintf("%s-%s", gitshipApp.Name, v.Name)
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      v.Name,
+			MountPath: v.MountPath,
+		})
+		volumes = append(volumes, corev1.Volume{
+			Name: v.Name,
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: pvcName,
+				},
+			},
+		})
+	}
+
+	// 2. Secret Mounts (Files)
+	for i, sm := range gitshipApp.Spec.SecretMounts {
+		volName := fmt.Sprintf("secret-%d", i)
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      volName,
+			MountPath: sm.MountPath,
+			ReadOnly:  true,
+		})
+		volumes = append(volumes, corev1.Volume{
+			Name: volName,
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: sm.SecretName,
+				},
+			},
+		})
+	}
+
+	// 3. Common Temp Mounts (for non-root support)
+	tempDirs := []string{"/tmp", "/var/cache/nginx", "/var/run"}
+	for i, dir := range tempDirs {
+		name := fmt.Sprintf("tmp-%d", i)
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      name,
+			MountPath: dir,
+		})
+		volumes = append(volumes, corev1.Volume{
+			Name: name,
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		})
+	}
+
+	return volumes, volumeMounts
+}
+
+func (r *GitshipAppReconciler) updateAppStatus(ctx context.Context, gitshipApp *gitshipiov1alpha1.GitshipApp, replicas int32) error {
+	dep := &appsv1.Deployment{}
+	_ = r.Get(ctx, types.NamespacedName{Name: gitshipApp.Name, Namespace: gitshipApp.Namespace}, dep)
+
+	statusChanged := false
+	if gitshipApp.Status.DesiredReplicas != replicas || gitshipApp.Status.ReadyReplicas != dep.Status.ReadyReplicas {
+		gitshipApp.Status.DesiredReplicas = replicas
+		gitshipApp.Status.ReadyReplicas = dep.Status.ReadyReplicas
+		statusChanged = true
+	}
+
+	if dep.Status.ReadyReplicas > 0 && dep.Status.ReadyReplicas >= replicas {
+		if gitshipApp.Status.Phase != phaseRunning {
+			gitshipApp.Status.Phase = phaseRunning
+			gitshipApp.Status.LastDeployedAt = metav1.Now().Format(time.RFC3339)
+			statusChanged = true
+		}
+	}
+
+	// Calculate AppURL based on Ingress
+	newAppURL := ""
+	if len(gitshipApp.Spec.Ingresses) > 0 {
+		proto := "http"
+		if gitshipApp.Spec.Ingresses[0].TLS {
+			proto = "https"
+		}
+		newAppURL = fmt.Sprintf("%s://%s", proto, gitshipApp.Spec.Ingresses[0].Host)
+	}
+
+	if gitshipApp.Status.AppURL != newAppURL {
+		gitshipApp.Status.AppURL = newAppURL
+		statusChanged = true
+	}
+
+	// Cleanup: Force clear if it still contains internal domain (fallback)
+	if strings.Contains(gitshipApp.Status.AppURL, ".svc.cluster.local") {
+		gitshipApp.Status.AppURL = ""
+		statusChanged = true
+	}
+
+	podList := &corev1.PodList{}
+	if err := r.List(ctx, podList, client.InNamespace(gitshipApp.Namespace), client.MatchingLabels{"app": gitshipApp.Name}); err == nil {
+		var totalRestarts int32
+		for _, pod := range podList.Items {
+			for _, cs := range pod.Status.ContainerStatuses {
+				totalRestarts += cs.RestartCount
+			}
+		}
+		if gitshipApp.Status.RestartCount != totalRestarts {
+			gitshipApp.Status.RestartCount = totalRestarts
+			statusChanged = true
+		}
+	}
+
+	if statusChanged {
+		if err := r.Status().Update(ctx, gitshipApp); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *GitshipAppReconciler) resolveAuthAndCommit(ctx context.Context, gitshipApp *gitshipiov1alpha1.GitshipApp) (string, string, string, *ctrl.Result) {
+	// 1. Try SSH Key
+	privateKey := ""
+	sshSecret := &corev1.Secret{}
+	sshSecretName := fmt.Sprintf("%s-ssh-key", gitshipApp.Name)
+	if err := r.Get(ctx, types.NamespacedName{Name: sshSecretName, Namespace: gitshipApp.Namespace}, sshSecret); err == nil {
+		privateKey = string(sshSecret.Data["ssh-privatekey"])
+	}
+
+	// 2. Try GitHub Token
+	githubToken := ""
+	tokenSecret := &corev1.Secret{}
+	if err := r.Get(ctx, types.NamespacedName{Name: "gitship-github-token", Namespace: gitshipApp.Namespace}, tokenSecret); err == nil {
+		githubToken = string(tokenSecret.Data["token"])
+	}
+
+	// Resolve latest commit using 3-step strategy: SSH -> Token -> Anon
+	repoURL := gitshipApp.Spec.RepoURL
+	source := gitshipApp.Spec.Source
+
+	latestCommit, err := resolveLatestCommit(repoURL, source, privateKey, githubToken)
+	if err != nil {
+		log.Error(err, "Failed to resolve latest commit", "repo", repoURL)
+
+		// If it's an auth error, mark as AuthError phase
+		errMsg := strings.ToLower(err.Error())
+		if strings.Contains(errMsg, "auth") || strings.Contains(errMsg, "unauthorized") {
+			gitshipApp.Status.Phase = "AuthError"
+			_ = r.Status().Update(ctx, gitshipApp)
+			return "", "", "", &ctrl.Result{RequeueAfter: 5 * time.Minute}
+		}
+
+		if gitshipApp.Status.Phase == "Building" {
+			gitshipApp.Status.Phase = "Failed"
+			_ = r.Status().Update(ctx, gitshipApp)
+		}
+		return "", "", "", &ctrl.Result{RequeueAfter: 1 * time.Minute}
+	}
+
+	// SUCCESS: Clear AuthError if it was set
+	if gitshipApp.Status.Phase == "AuthError" {
+		log.Info("Connection successful, clearing AuthError")
+		gitshipApp.Status.Phase = phaseRunning
+		if err := r.Status().Update(ctx, gitshipApp); err != nil {
+			log.Error(err, "Failed to clear AuthError status")
+		}
+	}
+
+	return latestCommit, privateKey, githubToken, nil
+}
+
+func (r *GitshipAppReconciler) ensureBuildJob(ctx context.Context, gitshipApp *gitshipiov1alpha1.GitshipApp, jobName, latestCommit, privateKey string) error {
+	log.Info("New commit detected", "commit", latestCommit, "old", gitshipApp.Status.LatestBuildID)
+
+	pushImage, _ := r.resolveImageNames(gitshipApp, latestCommit)
+	cacheRepo := strings.Split(pushImage, ":")[0] + "-cache"
+
+	kanikoArgs := []string{
+		"--dockerfile=Dockerfile",
+		"--context=dir:///workspace",
+		"--destination=" + pushImage,
+		"--cache=true",
+		"--cache-repo=" + cacheRepo,
+	}
+
+	volumeMounts := []corev1.VolumeMount{{Name: "workspace", MountPath: "/workspace"}}
+	volumes := []corev1.Volume{{Name: "workspace", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}}}
+
+	var initEnv []corev1.EnvVar
+	if err := r.Get(ctx, types.NamespacedName{Name: "gitship-github-token", Namespace: gitshipApp.Namespace}, &corev1.Secret{}); err == nil {
+		initEnv = append(initEnv, corev1.EnvVar{
+			Name: "GITHUB_TOKEN",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "gitship-github-token"},
+					Key:                  "token",
+				},
+			},
+		})
+	}
+
+	gitCloneCmd := `
+		if [ -n "$GITHUB_TOKEN" ]; then 
+			REPO_URL=$(echo $REPO_URL | sed "s/https:\/\//https:\/\/oauth2:$GITHUB_TOKEN@/"); 
+		fi; 
+		git clone $REPO_URL /workspace && cd /workspace && git checkout $COMMIT_ID
+	`
+
+	if privateKey != "" {
+		sshSecretName := fmt.Sprintf("%s-ssh-key", gitshipApp.Name)
+		sshUrl := gitshipApp.Spec.RepoURL
+		if strings.HasPrefix(sshUrl, "https://github.com/") {
+			sshUrl = strings.Replace(sshUrl, "https://github.com/", "git@github.com:", 1)
+		}
+
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{Name: "ssh-key", MountPath: "/etc/ssh-key", ReadOnly: true})
+		volumes = append(volumes, corev1.Volume{
+			Name: "ssh-key",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName:  sshSecretName,
+					DefaultMode: func(i int32) *int32 { return &i }(0400),
+				},
+			},
+		})
+
+		gitCloneCmd = fmt.Sprintf(`
+			mkdir -p /root/.ssh && 
+			cp /etc/ssh-key/ssh-privatekey /root/.ssh/id_rsa && 
+			chmod 600 /root/.ssh/id_rsa && 
+			export GIT_SSH_COMMAND="ssh -i /root/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" && 
+			if git clone %s /workspace; then 
+				cd /workspace && git checkout $COMMIT_ID; 
+			else 
+				if [ -n "$GITHUB_TOKEN" ]; then 
+					REPO_URL=$(echo $REPO_URL | sed "s/https:\/\//https:\/\/oauth2:$GITHUB_TOKEN@/"); 
+				fi; 
+				git clone $REPO_URL /workspace && cd /workspace && git checkout $COMMIT_ID; 
+			fi
+		`, sshUrl)
+	}
+
+	buildResources := resolveResources(gitshipApp.Spec.Resources)
+
+	newJob := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      jobName,
+			Namespace: gitshipApp.Namespace,
+			Labels:    map[string]string{"gitship.io/app": gitshipApp.Name, "gitship.io/commit": latestCommit},
+		},
+		Spec: batchv1.JobSpec{
+			BackoffLimit:            func(i int32) *int32 { return &i }(1),
+			TTLSecondsAfterFinished: func(i int32) *int32 { return &i }(3600),
+			ActiveDeadlineSeconds:   func(i int64) *int64 { return &i }(3600),
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyNever,
+					InitContainers: []corev1.Container{{
+						Name: "git-clone", Image: r.Config.ImageGit,
+						Command: []string{"/bin/sh", "-c", gitCloneCmd},
+						Env: append([]corev1.EnvVar{
+							{Name: "REPO_URL", Value: gitshipApp.Spec.RepoURL},
+							{Name: "COMMIT_ID", Value: latestCommit},
+						}, initEnv...),
+						VolumeMounts: volumeMounts, Resources: buildResources,
+					}},
+					Containers: []corev1.Container{{
+						Name: "kaniko", Image: r.Config.ImageKaniko,
+						Args: kanikoArgs, VolumeMounts: volumeMounts, Resources: buildResources,
+					}},
+					Volumes: volumes,
+				},
+			},
+		},
+	}
+
+	if err := ctrl.SetControllerReference(gitshipApp, newJob, r.Scheme); err != nil {
+		return err
+	}
+
+	gitshipApp.Status.Phase = "Building"
+	gitshipApp.Status.LatestBuildID = latestCommit
+	_ = r.Status().Update(ctx, gitshipApp)
+
+	return r.Create(ctx, newJob)
+}
+
 func (r *GitshipAppReconciler) recordBuild(app *gitshipiov1alpha1.GitshipApp, commit string, status string, message string) {
 	record := gitshipiov1alpha1.BuildRecord{
 		CommitID:       commit,
@@ -946,7 +967,6 @@ func (r *GitshipAppReconciler) resolveImageNames(app *gitshipiov1alpha1.GitshipA
 
 		pullRepo := r.Config.RegistryPullURL
 		if pullRepo == "" {
-			// Smart Fallback: If pushing to internal registry service, default pull to NodePort (for Kind/Local)
 			if strings.Contains(pushRepo, "gitship-registry") && strings.Contains(pushRepo, ".svc.cluster.local") {
 				pullRepo = "localhost:30005"
 			} else {

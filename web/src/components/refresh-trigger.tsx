@@ -20,8 +20,8 @@ export function RefreshTrigger() {
                     const data = JSON.parse(event.data)
                     console.log(`[RefreshTrigger] Resource update: ${data.name} (${data.type})`)
                     router.refresh()
-                } catch (e) {
-                    // Likely keep-alive or malformed data
+                } catch {
+                    // Ignore keep-alive or malformed data
                 }
             }
 

@@ -19,8 +19,7 @@ export async function PATCH(
     const patchData = await req.json()
     console.log(`[API] PATCH GitshipApp ${name} in ${namespace}:`, JSON.stringify(patchData))
 
-    // Create a JSON Patch array
-    const patch: any[] = []
+    const patch = []
     
     if (patchData.spec) {
       if (patchData.spec.resources) {
@@ -48,13 +47,18 @@ export async function PATCH(
       plural: "gitshipapps",
       name,
       body: patch,
-    }, { headers: { "Content-Type": "application/json-patch+json" } } as any)
+    }, { 
+      // @ts-expect-error custom headers for JSON Patch
+      headers: { "Content-Type": "application/json-patch+json" } 
+    })
 
     console.log(`[API] SUCCESS: Patched GitshipApp ${name} in ${namespace}`)
     return NextResponse.json({ ok: true })
-  } catch (e: any) {
+  } catch (e: unknown) {
+    // @ts-expect-error dynamic access
     console.error("Failed to patch app:", e.body?.message || e.message)
     return NextResponse.json(
+      // @ts-expect-error dynamic access
       { error: e.body?.message || e.message },
       { status: 500 }
     )

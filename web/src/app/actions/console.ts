@@ -1,7 +1,7 @@
 "use server"
 
 import { auth } from "@/auth"
-import { hasNamespaceAccess } from "@/lib/auth-utils"
+import { hasNamespaceAccess, resolveUserSession } from "@/lib/auth-utils"
 import { createConsoleToken } from "@/lib/tokens"
 
 export async function generateConsoleTokenAction(namespace: string, podName: string) {
@@ -11,7 +11,7 @@ export async function generateConsoleTokenAction(namespace: string, podName: str
     throw new Error("Access Denied")
   }
 
-  const { internalId } = session ? (session as any) : { internalId: "unknown" } // hasNamespaceAccess already verified access
+  const { internalId } = resolveUserSession(session)
 
   return await createConsoleToken(namespace, podName, internalId)
 }

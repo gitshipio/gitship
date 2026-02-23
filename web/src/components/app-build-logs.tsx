@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { useCallback, useState, useEffect, useRef } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Terminal, Loader2, RefreshCcw, CheckCircle2, XCircle, Clock, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -13,14 +13,20 @@ interface AppBuildLogsProps {
     buildHistory?: { commitId: string; status: string; completionTime?: string; message?: string }[]
 }
 
+interface BuildStatus {
+    succeeded?: number
+    failed?: number
+    active?: number
+}
+
 export function AppBuildLogs({ appName, namespace, buildHistory }: AppBuildLogsProps) {
     const [logs, setLogs] = useState<string>("Loading build logs...")
     const [loading, setLoading] = useState(true)
     const [jobName, setJobName] = useState<string | null>(null)
-    const [status, setStatus] = useState<any>(null)
+    const [status, setStatus] = useState<BuildStatus | null>(null)
     const scrollRef = useRef<HTMLDivElement>(null)
 
-    const fetchLogs = async () => {
+    const fetchLogs = useCallback(async () => {
         try {
             const res = await fetch(`/api/apps/${namespace}/${appName}/build-logs`)
             const data = await res.json()
@@ -31,12 +37,13 @@ export function AppBuildLogs({ appName, namespace, buildHistory }: AppBuildLogsP
                 setJobName(data.jobName)
                 setStatus(data.status)
             }
-        } catch (e: any) {
+        } catch (e: unknown) {
+            // @ts-expect-error dynamic access
             setLogs(`Failed to fetch logs: ${e.message}`)
         } finally {
             setLoading(false)
         }
-    }
+    }, [appName, namespace])
 
     useEffect(() => {
         fetchLogs()
@@ -47,7 +54,7 @@ export function AppBuildLogs({ appName, namespace, buildHistory }: AppBuildLogsP
             }
         }, 3000)
         return () => clearInterval(interval)
-    }, [appName, namespace, status])
+    }, [fetchLogs, status])
 
     useEffect(() => {
         if (scrollRef.current) {
@@ -55,8 +62,8 @@ export function AppBuildLogs({ appName, namespace, buildHistory }: AppBuildLogsP
         }
     }, [logs])
 
-    const isSuccess = status?.succeeded > 0
-    const isFailed = status?.failed > 0
+    const isSuccess = (status?.succeeded ?? 0) > 0
+    const isFailed = (status?.failed ?? 0) > 0
     const isActive = status && !isSuccess && !isFailed
 
     const handleRollback = async (commitId: string) => {
@@ -72,7 +79,8 @@ export function AppBuildLogs({ appName, namespace, buildHistory }: AppBuildLogsP
             } else {
                 alert("Failed to initiate rollback.")
             }
-        } catch (e: any) {
+        } catch (e: unknown) {
+            // @ts-expect-error dynamic access
             alert(`Error: ${e.message}`)
         }
     }

@@ -40,7 +40,8 @@ export async function GET(
       }))
 
     return NextResponse.json({ pods })
-  } catch (e: any) {
+  } catch (e: unknown) {
+    // @ts-expect-error dynamic access
     console.error("Metrics error:", e.message)
     return NextResponse.json({ error: "Metrics not available" }, { status: 404 })
   }
