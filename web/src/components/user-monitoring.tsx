@@ -1,8 +1,8 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Cpu, MemoryStick, Box, Activity, Zap, TrendingUp, Info, Loader2, Settings2, Save, X, Database } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { Cpu, MemoryStick, Box, Activity, Zap, TrendingUp, Info, Loader2, Settings2, Save, X, Database, Blocks, CheckCircle2, AlertCircle } from "lucide-react"
+import { cn, parseResourceValue, stripUnits } from "@/lib/utils"
 import { useState, useEffect } from "react"
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
@@ -11,6 +11,8 @@ import { Badge } from "@/components/ui/badge"
 
 interface AppMetrics {
     name: string
+    fullName?: string
+    type: "app" | "integration"
     namespace: string
     cpuUsage: number
     cpuLimit: string
@@ -19,6 +21,7 @@ interface AppMetrics {
     storageUsage: number
     storageLimit: string
     podCount: number
+    replicas: number
 }
 
 interface MetricsData {
@@ -35,19 +38,15 @@ interface MetricsData {
     apps: AppMetrics[]
 }
 
-function parseResourceValue(val: string): number {
-    if (!val) return 0
-    const s = val.toString().toLowerCase()
-    if (s.endsWith("m")) return parseFloat(s)
-    if (s.endsWith("gi")) return parseFloat(s) * 1024 * 1024 * 1024
-    if (s.endsWith("mi")) return parseFloat(s) * 1024 * 1024
-    if (s.endsWith("ki")) return parseFloat(s) * 1024
-    return parseFloat(s)
-}
-
-function formatMemory(bytes: number) {
+function formatMemory(val: number | string) {
+    const bytes = typeof val === 'string' ? parseResourceValue(val) : val
     if (bytes >= 1024 * 1024 * 1024) return (bytes / (1024 * 1024 * 1024)).toFixed(1) + "Gi"
     return (bytes / (1024 * 1024)).toFixed(0) + "Mi"
+}
+
+function formatCpu(millicores: string | number) {
+    const m = typeof millicores === 'string' ? parseResourceValue(millicores) : millicores
+    return (m / 1000).toFixed(2) + " Cores"
 }
 
 export function UserMonitoring() {
@@ -84,8 +83,8 @@ export function UserMonitoring() {
     }
 
     const total = data?.total
-    const cpuUsageNum = parseResourceValue(total?.cpuUsage || "0")
-    const cpuLimitNum = parseResourceValue(total?.cpuLimit || "0")
+    const cpuUsageNum = typeof total?.cpuUsage === 'number' ? total.cpuUsage : parseResourceValue(total?.cpuUsage || "0")
+    const cpuLimitNum = typeof total?.cpuLimit === 'number' ? total.cpuLimit : parseResourceValue(total?.cpuLimit || "0")
     const cpuPercent = cpuLimitNum > 0 ? (cpuUsageNum / cpuLimitNum) * 100 : 0
 
     const memUsageNum = total?.memoryUsage || 0
@@ -113,8 +112,8 @@ export function UserMonitoring() {
                     </CardHeader>
                     <CardContent className="pt-6">
                         <div className="flex items-baseline gap-1">
-                            <span className="text-4xl font-black text-emerald-500 tracking-tighter">{total?.cpuUsage}</span>
-                            <span className="text-xs font-bold text-muted-foreground">/ {total?.cpuLimit} cores</span>
+                            <span className="text-4xl font-black text-emerald-500 tracking-tighter">{formatCpu(total?.cpuUsage || "0m")}</span>
+                            <span className="text-xs font-bold text-muted-foreground">/ {formatCpu(total?.cpuLimit || "0")} total</span>
                         </div>
                         <div className="mt-4 space-y-1.5">
                             <div className="flex justify-between text-[9px] font-bold uppercase opacity-50">
@@ -242,33 +241,83 @@ export function UserMonitoring() {
 function AppResourceRow({ app, onUpdate }: { app: AppMetrics, onUpdate: () => void }) {
     const [editing, setEditing] = useState(false)
     const [saving, setLoading] = useState(false)
+    const [success, setSuccess] = useState(false)
+    const [errorMsg, setErrorMsg] = useState<string | null>(null)
     
-    const [cpu, setCpu] = useState(app.cpuLimit)
-    const [mem, setMem] = useState(app.memoryLimit)
-    const [storage, setStorage] = useState(app.storageLimit)
+    // Store raw numbers for editing
+    const [cpu, setCpu] = useState(stripUnits(app.cpuLimit, 'cpu'))
+    const [mem, setMem] = useState(stripUnits(app.memoryLimit, 'mem'))
+    const [storage, setStorage] = useState(stripUnits(app.storageLimit, 'mem'))
+    const [replicas, setReplicas] = useState(app.replicas)
+
+    // Sync state when app prop changes, but ONLY when not editing
+    useEffect(() => {
+        if (!editing) {
+            setCpu(stripUnits(app.cpuLimit, 'cpu'))
+            setMem(stripUnits(app.memoryLimit, 'mem'))
+            setStorage(stripUnits(app.storageLimit, 'mem'))
+            setReplicas(app.replicas)
+        }
+    }, [app, editing])
 
     const handleSave = async () => {
         setLoading(true)
         try {
-            const res = await fetch(`/api/apps/${app.namespace}/${app.name}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    spec: {
-                        resources: {
-                            cpu,
-                            memory: mem,
-                            storage: storage
+            // Strictly append units. User only enters numbers.
+            // We assume input is always a valid number string.
+            const cpuVal = cpu.trim() + "m"
+            const memVal = mem.trim() + "Mi"
+            const storageVal = storage.trim() + "Mi"
+
+            let res;
+            if (app.type === "app") {
+                res = await fetch(`/api/apps/${app.namespace}/${app.name}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        spec: {
+                            resources: {
+                                cpu: cpuVal,
+                                memory: memVal,
+                                storage: storageVal
+                            },
+                            replicas
                         }
-                    }
+                    })
                 })
-            })
-            if (res.ok) {
+            } else {
+                // Integration
+                res = await fetch(`/api/user/integrations`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        name: app.name,
+                        patch: {
+                            spec: {
+                                resources: {
+                                    cpu: cpuVal,
+                                    memory: memVal
+                                },
+                                replicas
+                            }
+                        }
+                    })
+                })
+            }
+            if (res && res.ok) {
+                setSuccess(true)
+                setErrorMsg(null)
+                setTimeout(() => setSuccess(false), 3000)
                 setEditing(false)
                 onUpdate()
+            } else if (res) {
+                const data = await res.json()
+                setErrorMsg(data.error || "Failed to update")
+                setTimeout(() => setErrorMsg(null), 5000)
             }
-        } catch (e) {
-            console.error("Update failed", e)
+        } catch (e: any) {
+            setErrorMsg(e.message)
+            setTimeout(() => setErrorMsg(null), 5000)
         } finally {
             setLoading(false)
         }
@@ -283,10 +332,11 @@ function AppResourceRow({ app, onUpdate }: { app: AppMetrics, onUpdate: () => vo
             <div className="p-4 md:p-6 flex flex-col md:flex-row items-center gap-6">
                 <div className="flex-1 min-w-0 w-full">
                     <div className="flex items-center gap-3 mb-4">
-                        <div className="p-2 bg-primary/10 rounded-lg">
-                            <Box className="w-4 h-4 text-primary" />
+                        <div className={cn("p-2 rounded-lg", app.type === "app" ? "bg-primary/10 text-primary" : "bg-sky-500/10 text-sky-600")}>
+                            {app.type === "app" ? <Box className="w-4 h-4" /> : <Blocks className="w-4 h-4" />}
                         </div>
                         <h4 className="font-bold text-base truncate">{app.name}</h4>
+                        <Badge variant="outline" className="text-[9px] font-black px-1.5 py-0 uppercase opacity-70">{app.type}</Badge>
                         <Badge variant="outline" className="text-[9px] font-black px-1.5 py-0">{app.podCount} Pods</Badge>
                     </div>
 
@@ -294,42 +344,66 @@ function AppResourceRow({ app, onUpdate }: { app: AppMetrics, onUpdate: () => vo
                         <div className="space-y-2">
                             <div className="flex justify-between items-end text-[10px] font-black uppercase">
                                 <span className="opacity-50 flex items-center gap-1"><Cpu className="w-3 h-3" /> CPU</span>
-                                <span>{app.cpuUsage}m <span className="opacity-30">/</span> {app.cpuLimit}</span>
+                                <span>{formatCpu(app.cpuUsage)} <span className="opacity-30">/</span> {formatCpu(app.cpuLimit)}</span>
                             </div>
                             <Progress value={cpuUsagePct} className="h-1.5" />
                         </div>
                         <div className="space-y-2">
                             <div className="flex justify-between items-end text-[10px] font-black uppercase">
                                 <span className="opacity-50 flex items-center gap-1"><Zap className="w-3 h-3" /> RAM</span>
-                                <span>{formatMemory(app.memoryUsage)} <span className="opacity-30">/</span> {app.memoryLimit}</span>
+                                <span>{formatMemory(app.memoryUsage)} <span className="opacity-30">/</span> {formatMemory(app.memoryLimit)}</span>
                             </div>
                             <Progress value={memUsagePct} className="h-1.5" />
                         </div>
                         <div className="space-y-2">
-                            <div className="flex justify-between items-end text-[10px] font-black uppercase">
-                                <span className="opacity-50 flex items-center gap-1"><Database className="w-3 h-3" /> Disk</span>
-                                <span>{formatMemory(app.storageUsage)} <span className="opacity-30">/</span> {app.storageLimit}</span>
-                            </div>
-                            <Progress value={storageUsagePct} className="h-1.5" />
+                            {app.type === "app" ? (
+                                <>
+                                    <div className="flex justify-between items-end text-[10px] font-black uppercase">
+                                        <span className="opacity-50 flex items-center gap-1"><Database className="w-3 h-3" /> Disk</span>
+                                        <span>{formatMemory(app.storageUsage)} <span className="opacity-30">/</span> {app.storageLimit}</span>
+                                    </div>
+                                    <Progress value={storageUsagePct} className="h-1.5" />
+                                </>
+                            ) : (
+                                <div className="h-full flex items-center justify-center opacity-20 italic text-[10px] uppercase font-black">
+                                    No persistent storage
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
 
                 <div className="flex items-center gap-2 pt-2 md:pt-0">
+                    {success && !editing && (
+                        <div className="flex items-center gap-1.5 text-emerald-500 font-bold text-xs animate-in fade-in slide-in-from-right-2">
+                            <CheckCircle2 className="w-4 h-4" /> Saved!
+                        </div>
+                    )}
+                    {errorMsg && (
+                        <div className="flex items-center gap-1.5 text-destructive font-bold text-[10px] max-w-[150px] animate-in shake-1 duration-300">
+                            <AlertCircle className="w-3 h-3 shrink-0" /> {errorMsg}
+                        </div>
+                    )}
                     {editing ? (
                         <div className="flex items-center gap-2 bg-muted/30 p-2 rounded-xl border animate-in zoom-in-95">
                             <div className="space-y-1">
-                                <span className="text-[8px] font-black uppercase ml-1 opacity-50">CPU</span>
+                                <span className="text-[8px] font-black uppercase ml-1 opacity-50">mCore</span>
                                 <Input value={cpu} onChange={e => setCpu(e.target.value)} className="h-8 w-16 font-mono text-[10px]" />
                             </div>
                             <div className="space-y-1">
-                                <span className="text-[8px] font-black uppercase ml-1 opacity-50">RAM</span>
+                                <span className="text-[8px] font-black uppercase ml-1 opacity-50">MiB</span>
                                 <Input value={mem} onChange={e => setMem(e.target.value)} className="h-8 w-16 font-mono text-[10px]" />
                             </div>
                             <div className="space-y-1">
-                                <span className="text-[8px] font-black uppercase ml-1 opacity-50">Disk</span>
-                                <Input value={storage} onChange={e => setStorage(e.target.value)} className="h-8 w-16 font-mono text-[10px]" />
+                                <span className="text-[8px] font-black uppercase ml-1 opacity-50">Pods</span>
+                                <Input type="number" value={replicas} onChange={e => setReplicas(parseInt(e.target.value) || 0)} className="h-8 w-12 font-mono text-[10px]" />
                             </div>
+                            {app.type === "app" && (
+                                <div className="space-y-1">
+                                    <span className="text-[8px] font-black uppercase ml-1 opacity-50">MiB Disk</span>
+                                    <Input value={storage} onChange={e => setStorage(e.target.value)} className="h-8 w-16 font-mono text-[10px]" />
+                                </div>
+                            )}
                             <div className="flex gap-1 pl-2">
                                 <Button size="icon" variant="ghost" className="h-8 w-8 text-emerald-500" onClick={handleSave} disabled={saving}>
                                     {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}

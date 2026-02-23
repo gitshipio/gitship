@@ -69,6 +69,11 @@ export function GitshipAppCard({ app }: { app: GitshipApp }) {
   const repoName = app.spec.repoUrl.split("/").pop()?.replace(".git", "") || app.spec.repoUrl
   const source = app.spec.source
   const commit = app.status?.latestBuildId?.substring(0, 7)
+  
+  // Security/UX: Filter out internal K8s URLs
+  const rawUrl = app.status?.appUrl || ""
+  const isInternal = rawUrl.includes(".svc.cluster.local") || rawUrl.includes("http://gitship-")
+  const appUrl = (rawUrl && !isInternal) ? rawUrl : null
 
   return (
     <Card className="w-full relative group hover:shadow-md transition-all duration-300 border-border/60 bg-card/50 hover:bg-card flex flex-col">
@@ -83,12 +88,12 @@ export function GitshipAppCard({ app }: { app: GitshipApp }) {
                   {app.metadata.name}
               </h3>
               <div className="text-sm text-muted-foreground mt-1 truncate max-w-[140px] md:max-w-[180px]">
-                {app.status?.appUrl ? (
-                    <span className="flex items-center gap-1" title={app.status.appUrl.replace(/^https?:\/\//, '')}>
-                        {app.status.appUrl.replace(/^https?:\/\//, '')}
+                {appUrl ? (
+                    <span className="flex items-center gap-1" title={appUrl.replace(/^https?:\/\//, '')}>
+                        {appUrl.replace(/^https?:\/\//, '')}
                     </span>
                 ) : (
-                    <span title={app.metadata.namespace}>{app.metadata.namespace}</span>
+                    <Badge variant="outline" className="text-[9px] uppercase font-bold opacity-50">Internal Only</Badge>
                 )}
               </div>
             </div>

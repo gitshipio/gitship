@@ -33,11 +33,30 @@ function parseMemory(mem: string): number {
 
 function BarChart({ value, max, label, unit, color }: { value: number; max: number; label: string; unit: string; color: string }) {
     const percent = max > 0 ? Math.min((value / max) * 100, 100) : 0
+    
+    let displayValue = value.toFixed(1)
+    let displayMax = max.toFixed(0)
+    let displayUnit = unit
+
+    if (unit === "m") {
+        displayValue = (value / 1000).toFixed(2)
+        displayMax = (max / 1000).toFixed(2)
+        displayUnit = " Cores"
+    } else if (unit === "Mi") {
+        if (value >= 1024) {
+            displayValue = (value / 1024).toFixed(1)
+            displayUnit = " Gi"
+        }
+        if (max >= 1024) {
+            displayMax = (max / 1024).toFixed(1)
+        }
+    }
+
     return (
         <div className="space-y-1">
             <div className="flex justify-between text-xs text-muted-foreground">
                 <span>{label}</span>
-                <span>{value.toFixed(0)}{unit} / {max.toFixed(0)}{unit}</span>
+                <span>{displayValue}{displayUnit} / {displayMax}{displayUnit}</span>
             </div>
             <div className="h-2.5 bg-muted rounded-full overflow-hidden">
                 <div

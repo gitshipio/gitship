@@ -7,10 +7,8 @@ import Link from "next/link"
 import { Plus, PackageOpen, LayoutGrid, Activity, ShieldAlert } from "lucide-react"
 import { ensureGitshipUser, ensureGitHubSecret } from "@/lib/namespace"
 import { RefreshTrigger } from "@/components/refresh-trigger"
-import { ResourceUsage } from "@/components/resource-usage"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { UserMonitoring } from "@/components/user-monitoring"
 import { getUserRole, resolveUserSession } from "@/lib/auth-utils"
+import { DashboardTabs } from "@/components/dashboard-tabs"
 
 export const dynamic = 'force-dynamic'
 
@@ -21,10 +19,10 @@ export default async function Home() {
 
   let userNamespace = ""
   if (session?.user) {
-    const { githubId, username, internalId } = resolveUserSession(session)
+    const { githubId, username, internalId, email } = resolveUserSession(session)
     
     // Ensure user record exists, keyed by GitHub ID
-    await ensureGitshipUser(username, parseInt(githubId))
+    await ensureGitshipUser(username, parseInt(githubId), email)
     userNamespace = `gitship-${internalId}` // Result: gitship-u-ID
     
     role = await getUserRole(internalId)
@@ -110,55 +108,7 @@ export default async function Home() {
       <div className="grid grid-cols-1 gap-8">
         {/* Main Content (Full Width) */}
         <div className="space-y-8">
-            <Tabs defaultValue="apps" className="space-y-8">
-                <div className="flex items-center justify-between border-b pb-1">
-                    <TabsList className="bg-transparent h-auto p-0 gap-6">
-                        <TabsTrigger 
-                            value="apps" 
-                            className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 pb-3 gap-2 font-bold text-lg"
-                        >
-                            <LayoutGrid className="w-5 h-5" />
-                            Applications
-                        </TabsTrigger>
-                        <TabsTrigger 
-                            value="monitoring" 
-                            className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 pb-3 gap-2 font-bold text-lg"
-                        >
-                            <Activity className="w-5 h-5" />
-                            Live Stats
-                        </TabsTrigger>
-                    </TabsList>
-                </div>
-
-                <TabsContent value="apps" className="space-y-8 mt-0 border-none p-0 outline-none">
-                    {!hasApps ? (
-                        <div className="flex h-[450px] shrink-0 items-center justify-center rounded-2xl border-4 border-dashed border-muted bg-muted/5">
-                            <div className="mx-auto flex max-w-[420px] flex-col items-center justify-center text-center">
-                                <div className="flex h-24 w-24 items-center justify-center rounded-3xl bg-muted/50 mb-6 ring-8 ring-muted/20 rotate-3">
-                                    <PackageOpen className="h-12 w-12 text-muted-foreground" />
-                                </div>
-                                <h3 className="text-2xl font-bold">No applications found</h3>
-                                <p className="mb-6 mt-2 text-muted-foreground text-pretty">
-                                    Connect your first Git repository to start deploying to the cluster.
-                                </p>
-                                <Button asChild size="lg" className="rounded-xl">
-                                    <Link href="/new">
-                                        <Plus className="mr-2 h-5 w-5" /> Deploy your first app
-                                    </Link>
-                                </Button>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out">
-                            <AppGrid apps={appsList.items ?? []} />
-                        </div>
-                    )}
-                </TabsContent>
-
-                <TabsContent value="monitoring" className="mt-0 border-none p-0 outline-none">
-                    <UserMonitoring />
-                </TabsContent>
-            </Tabs>
+            <DashboardTabs apps={appsList.items ?? []} hasApps={hasApps} />
         </div>
       </div>
     </main>

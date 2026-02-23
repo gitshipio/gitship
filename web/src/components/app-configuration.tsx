@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Trash2, Plus, Save, RotateCcw, Database, Clock, Lock, GitBranch, Tag, Hash, ChevronDown, Key, Loader2, CheckCircle2, Search, Check, AlertCircle, Activity } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn, stripUnits } from "@/lib/utils"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { AppSecrets } from "./app-secrets"
 import { setupAppSSH } from "@/app/actions/secrets"
@@ -32,7 +32,6 @@ interface AppConfigurationProps {
         tls?: { enabled: boolean; issuer?: string }
         secretRefs?: string[]
         secretMounts?: { secretName: string; mountPath: string }[]
-        addons?: { type: string; name: string; size?: string }[]
     }
 }
 
@@ -42,8 +41,8 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
     if (!spec) return <div className="p-8 text-center text-muted-foreground italic">Configuration temporarily unavailable.</div>
 
     const [replicas, setReplicas] = useState(spec?.replicas ?? 1)
-    const [cpu, setCpu] = useState(spec?.resources?.cpu ?? "500m")
-    const [memory, setMemory] = useState(spec?.resources?.memory ?? "1Gi")
+    const [cpu, setCpu] = useState(stripUnits(spec?.resources?.cpu, 'cpu'))
+    const [memory, setMemory] = useState(stripUnits(spec?.resources?.memory, 'mem'))
     const [hcPath, setHcPath] = useState(spec?.healthCheck?.path ?? "")
     const [hcPort, setHcPort] = useState(spec?.healthCheck?.port ?? 8080)
     const [sourceType, setSourceType] = useState<"branch" | "tag" | "commit">(spec?.source?.type ?? "branch")
@@ -74,16 +73,9 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
     
     const [volumes, setVolumes] = useState(spec?.volumes || [])
     const [secretMounts, setSecretMounts] = useState<{ secretName: string; mountPath: string }[]>(spec?.secretMounts || [])
-    const [addons, setAddons] = useState<{ type: string; name: string; size?: string }[]>(spec?.addons || [])
     
     const [isPending, startTransition] = useTransition()
     const [message, setMessage] = useState("")
-
-    const addAddon = (type: string) => {
-        const id = Math.random().toString(36).substring(7)
-        setAddons([...addons, { type, name: `${type}-${id}`, size: "small" }])
-    }
-    const removeAddon = (idx: number) => setAddons(addons.filter((_, i) => i !== idx))
 
     useEffect(() => {
         const fetchRepoInfo = async () => {
@@ -210,8 +202,8 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
                 spec: {
                     replicas,
                     resources: {
-                        cpu,
-                        memory,
+                        cpu: cpu.trim() + "m",
+                        memory: memory.trim() + "Mi",
                     },
                     healthCheck: {
                         path: hcPath,
@@ -223,9 +215,11 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
                     },
                     authMethod,
                     env: Object.keys(env).length > 0 ? env : undefined,
-                    volumes: volumes.length > 0 ? volumes : undefined,
+                    volumes: volumes.map(v => ({
+                        ...v,
+                        size: v.size.endsWith('Mi') || v.size.endsWith('Gi') ? v.size : v.size + "Mi"
+                    })),
                     secretMounts: secretMounts.length > 0 ? secretMounts : undefined,
-                    addons: addons.length > 0 ? addons : undefined,
                     updateStrategy: {
                         type: updateStrategy,
                         interval: pollInterval,
@@ -279,20 +273,20 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="cpu">CPU Limit</Label>
+                                    <Label htmlFor="cpu">CPU (mCore)</Label>
                                     <Input
                                         id="cpu"
-                                        placeholder="500m"
+                                        placeholder="500"
                                         value={cpu}
                                         onChange={(e) => setCpu(e.target.value)}
                                         className="h-11 border-2 font-mono"
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="memory">Memory Limit</Label>
+                                    <Label htmlFor="memory">RAM (MiB)</Label>
                                     <Input
                                         id="memory"
-                                        placeholder="1Gi"
+                                        placeholder="1024"
                                         value={memory}
                                         onChange={(e) => setMemory(e.target.value)}
                                         className="h-11 border-2 font-mono"
@@ -581,11 +575,11 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
                                     />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <Label className="text-[10px] uppercase font-bold opacity-70">Size</Label>
+                                    <Label className="text-[10px] uppercase font-bold opacity-70">Size (MiB)</Label>
                                     <div className="flex items-center gap-2">
                                         <Input
-                                            placeholder="1Gi"
-                                            value={vol.size}
+                                            placeholder="1024"
+                                            value={stripUnits(vol.size, 'mem')}
                                             onChange={(e) => updateVolume(idx, "size", e.target.value)}
                                             className="h-10 text-sm font-mono bg-background"
                                         />
@@ -666,95 +660,6 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
                                         placeholder="5m"
                                     />
                                 </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
-            </section>
-
-            {/* 5. Marketplace & Addons */}
-            <section className="space-y-4 pb-20">
-                <h3 className="text-lg font-bold flex items-center gap-2 px-1">
-                    <Plus className="w-5 h-5 text-primary" />
-                    Marketplace & Addons
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {/* Catalog */}
-                    <Card className="md:col-span-1">
-                        <CardHeader className="py-4">
-                            <CardTitle className="text-xs font-bold uppercase opacity-50">Available Addons</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            <button 
-                                onClick={() => addAddon("postgres")}
-                                className="w-full flex items-center justify-between p-3 rounded-xl border-2 hover:border-primary hover:bg-primary/5 transition-all group"
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-600 font-bold group-hover:scale-110 transition-transform">PS</div>
-                                    <div className="text-left">
-                                        <p className="text-sm font-bold">PostgreSQL</p>
-                                        <p className="text-[10px] text-muted-foreground italic">Relational Database</p>
-                                    </div>
-                                </div>
-                                <Plus className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
-                            </button>
-
-                            <button 
-                                onClick={() => addAddon("redis")}
-                                className="w-full flex items-center justify-between p-3 rounded-xl border-2 hover:border-primary hover:bg-primary/5 transition-all group"
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center text-red-600 font-bold group-hover:scale-110 transition-transform">RD</div>
-                                    <div className="text-left">
-                                        <p className="text-sm font-bold">Redis</p>
-                                        <p className="text-[10px] text-muted-foreground italic">In-memory Cache</p>
-                                    </div>
-                                </div>
-                                <Plus className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
-                            </button>
-                        </CardContent>
-                    </Card>
-
-                    {/* Active Addons */}
-                    <Card className="md:col-span-2">
-                        <CardHeader className="py-4">
-                            <CardTitle className="text-xs font-bold uppercase opacity-50">Active Instances</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            {addons.length === 0 && (
-                                <div className="p-8 text-center border-2 border-dashed rounded-2xl bg-muted/5">
-                                    <p className="text-sm text-muted-foreground italic">No addons provisioned. Select an addon from the catalog to get started.</p>
-                                </div>
-                            )}
-                            {addons.map((a, idx) => (
-                                <div key={idx} className="flex items-center justify-between p-4 border-2 rounded-2xl bg-background shadow-sm animate-in zoom-in-95 duration-300">
-                                    <div className="flex items-center gap-4">
-                                        <div className={cn(
-                                            "w-12 h-12 rounded-xl flex items-center justify-center font-black text-xs",
-                                            a.type === "postgres" ? "bg-blue-500/10 text-blue-600" : "bg-red-500/10 text-red-600"
-                                        )}>
-                                            {a.type.substring(0, 2).toUpperCase()}
-                                        </div>
-                                        <div>
-                                            <p className="text-sm font-bold">{a.name}</p>
-                                            <div className="flex gap-2 mt-1">
-                                                <Badge variant="outline" className="text-[9px] h-4">{a.type}</Badge>
-                                                <Badge variant="secondary" className="text-[9px] h-4">Size: {a.size}</Badge>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground italic mr-4">
-                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> Linked to App
-                                    </div>
-                                    <Button size="icon" variant="ghost" className="text-destructive h-10 w-10" onClick={() => removeAddon(idx)}>
-                                        <Trash2 className="w-4 h-4" />
-                                    </Button>
-                                </div>
-                            ))}
-                            {addons.length > 0 && (
-                                <p className="text-[10px] text-muted-foreground italic pt-2 px-1">
-                                    Credentials (e.g. DATABASE_URL) are automatically injected into your app environment.
-                                </p>
                             )}
                         </CardContent>
                     </Card>

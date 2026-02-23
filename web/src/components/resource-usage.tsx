@@ -4,38 +4,24 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Cpu, MemoryStick, Box, Loader2, Zap, Database } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn, parseResourceValue } from "@/lib/utils"
 
 interface QuotaData {
     hard: Record<string, string>
     used: Record<string, string>
 }
 
-function parseResourceValue(val: string): number {
-    if (!val) return 0
-    const s = val.toString().toLowerCase()
-    if (s.endsWith("m")) return parseFloat(s)
-    if (s.endsWith("gi")) return parseFloat(s) * 1024 * 1024 * 1024
-    if (s.endsWith("mi")) return parseFloat(s) * 1024 * 1024
-    if (s.endsWith("ki")) return parseFloat(s) * 1024
-    return parseFloat(s)
-}
-
 function UsageDetail({ label, used, hard, unit, icon: Icon, color, isCpu }: any) {
     let usedNum = parseResourceValue(used)
     let hardNum = parseResourceValue(hard)
     
-    if (isCpu) {
-        if (!used.toString().endsWith("m")) usedNum *= 1000
-        if (!hard.toString().endsWith("m")) hardNum *= 1000
-    }
-    
     const percent = hardNum > 0 ? Math.min((usedNum / hardNum) * 100, 100) : 0
-    
     const remaining = Math.max(0, hardNum - usedNum)
     
     const format = (v: number) => {
-        if (isCpu) return v.toFixed(0) + "m"
+        if (isCpu) {
+            return (v / 1000).toFixed(2) + " Cores"
+        }
         if (v >= 1024 * 1024 * 1024) return (v / (1024 * 1024 * 1024)).toFixed(1) + "Gi"
         if (v >= 1024 * 1024) return (v / (1024 * 1024)).toFixed(0) + "Mi"
         if (label === "Active Pods") return v.toFixed(0)

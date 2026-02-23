@@ -12,7 +12,7 @@ import { useRouter } from "next/navigation"
 import { GitHubRepo } from "@/lib/github"
 import { RegistryConfig } from "@/lib/types"
 import { Search, Globe, Lock, Check, Loader2, ChevronDown, Settings2, ArrowRight, Github, Database, Trash2, Plus, Clock, GitBranch, Tag, Hash } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn, stripUnits } from "@/lib/utils"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 
 function SubmitButton({ pending }: { pending: boolean }) {
@@ -57,6 +57,8 @@ export function NewAppForm({ repos = [], registries = [] }: { repos?: GitHubRepo
   ])
   const [imageName, setImageName] = useState("")
   const [domain, setDomain] = useState("")
+  const [cpu, setCpu] = useState("500")
+  const [memory, setMemory] = useState("1024")
   const [volumes, setVolumes] = useState<{ name: string; mountPath: string; size: string }[]>([])
   const [updateStrategy, setUpdateStrategy] = useState<"polling" | "webhook">("polling")
   const [pollInterval, setPollInterval] = useState("5m")
@@ -308,6 +310,17 @@ export function NewAppForm({ repos = [], registries = [] }: { repos?: GitHubRepo
                             <div className="space-y-2">
                                 <Label htmlFor="name" className="text-sm font-semibold">App Name</Label>
                                 <Input id="name" name="name" value={appName} onChange={e => setAppName(e.target.value)} required className="h-12 border-2" />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="cpu" className="text-sm font-semibold">CPU Limit (mCore)</Label>
+                                    <Input id="cpu" name="cpu" value={cpu} onChange={e => setCpu(e.target.value)} className="h-12 border-2 font-mono" placeholder="500" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="memory" className="text-sm font-semibold">RAM Limit (MiB)</Label>
+                                    <Input id="memory" name="memory" value={memory} onChange={e => setMemory(e.target.value)} className="h-12 border-2 font-mono" placeholder="1024" />
+                                </div>
                             </div>
 
                             <div className="space-y-2">
@@ -574,11 +587,11 @@ export function NewAppForm({ repos = [], registries = [] }: { repos?: GitHubRepo
                                         />
                                     </div>
                                     <div className="space-y-1.5">
-                                        <Label className="text-[10px] uppercase font-bold opacity-70">Size</Label>
+                                        <Label className="text-[10px] uppercase font-bold opacity-70">Size (MiB)</Label>
                                         <div className="flex items-center gap-2">
                                             <Input
-                                                placeholder="1Gi"
-                                                value={vol.size}
+                                                placeholder="1024"
+                                                value={stripUnits(vol.size, 'mem')}
                                                 onChange={(e) => updateVolume(idx, "size", e.target.value)}
                                                 className="h-9 text-sm font-mono bg-background"
                                                 required

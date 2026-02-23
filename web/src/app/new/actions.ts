@@ -2,7 +2,7 @@
 
 import { auth } from "@/auth"
 import { k8sCustomApi } from "@/lib/k8s"
-import { ensureUserNamespace } from "@/lib/namespace"
+import { ensureUserNamespace, ensureGitshipUser } from "@/lib/namespace"
 import { getGitshipUser } from "@/lib/api"
 import { createRepositoryWebhook, addDeployKey } from "@/lib/github"
 import { generateSSHKeyPair } from "@/lib/ssh"
@@ -28,6 +28,8 @@ const createAppSchema = z.object({
     }))
   ),
   domain: z.string().optional(),
+  cpu: z.string().default("500"),
+  memory: z.string().default("1024"),
   registrySecretRef: z.string().optional(),
   updateStrategy: z.enum(["polling", "webhook"]).optional().default("polling"),
   pollInterval: z.string().optional().default("5m"),
@@ -47,7 +49,7 @@ export async function createApp(formData: FormData) {
     return { message: "Unauthorized" }
   }
 
-  const { internalId } = resolveUserSession(session)
+  const { internalId, email, username, githubId } = resolveUserSession(session)
   const user = await getGitshipUser(internalId)
 
   if (user?.spec.role === "restricted") {
@@ -62,6 +64,8 @@ export async function createApp(formData: FormData) {
     imageName: formData.get("imageName"),
     ports: formData.get("ports") || "[]",
     domain: formData.get("domain"),
+    cpu: formData.get("cpu") || "500",
+    memory: formData.get("memory") || "1024",
     registrySecretRef: formData.get("registrySecretRef"),
     updateStrategy: formData.get("updateStrategy"),
     pollInterval: formData.get("pollInterval"),
@@ -80,7 +84,8 @@ export async function createApp(formData: FormData) {
 
   const data = validatedFields.data
 
-  // Use stable internalId for the namespace
+  // Use stable internalId for the namespace, ensure user record is up-to-date with email
+  await ensureGitshipUser(username, parseInt(githubId), email)
   const namespace = await ensureUserNamespace(internalId)
 
   // 1. Setup SSH Authentication
@@ -132,6 +137,10 @@ export async function createApp(formData: FormData) {
       authMethod: authMethod,
       imageName: data.imageName,
       ports: data.ports,
+      resources: {
+        cpu: data.cpu.trim() + "m",
+        memory: data.memory.trim() + "Mi",
+      },
       ingresses: data.domain ? [{
           host: data.domain,
           path: "/",
@@ -139,7 +148,10 @@ export async function createApp(formData: FormData) {
       }] : [],
       registrySecretRef: data.registrySecretRef || "",
       replicas: 1,
-      volumes: data.volumes,
+      volumes: data.volumes?.map(v => ({
+        ...v,
+        size: v.size.endsWith('Mi') || v.size.endsWith('Gi') ? v.size : v.size + "Mi"
+      })),
       updateStrategy: {
         type: data.updateStrategy,
         interval: data.pollInterval,
