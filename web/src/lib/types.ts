@@ -25,6 +25,8 @@ export interface GitshipUser {
       memory?: string;
       pods?: string;
       storage?: string;
+      buildCPU?: string;
+      buildMemory?: string;
     };
   };
   status?: {
@@ -70,6 +72,7 @@ export interface GitshipAppSpec {
     issuer?: string;
   };
   secretRefs?: string[];
+  rebuildToken?: string;
 }
 
 export interface PortConfig {
@@ -123,6 +126,7 @@ export interface GitshipAppStatus {
   lastDeployedAt?: string;
   serviceType?: string;
   ingressHost?: string;
+  latestRebuildToken?: string;
 }
 
 export interface GitshipApp {

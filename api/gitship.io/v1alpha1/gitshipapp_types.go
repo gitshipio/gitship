@@ -59,6 +59,9 @@ type GitshipAppSpec struct {
 
 	// List of Secrets to mount as files
 	SecretMounts []SecretMountConfig `json:"secretMounts,omitempty"`
+
+	// Token to trigger a manual rebuild. Changing this value forces a new build.
+	RebuildToken string `json:"rebuildToken,omitempty"`
 }
 
 type SecretMountConfig struct {
@@ -170,6 +173,9 @@ type GitshipAppStatus struct {
 	LastDeployedAt  string `json:"lastDeployedAt,omitempty"`
 	ServiceType     string `json:"serviceType,omitempty"` // "ClusterIP", "NodePort", "LoadBalancer"
 	IngressHost     string `json:"ingressHost,omitempty"`
+
+	// Tracks the last processed rebuild token
+	LatestRebuildToken string `json:"latestRebuildToken,omitempty"`
 }
 
 // +kubebuilder:object:root=true
