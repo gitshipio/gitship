@@ -39,6 +39,7 @@ type GitshipAppSpec struct {
 	Ports       []PortConfig        `json:"ports,omitempty"` // Multiple port mappings
 	Env         map[string]string   `json:"env,omitempty"`
 	Resources   ResourceConfig      `json:"resources,omitempty"` // Resource requests/limits
+	BuildResources ResourceConfig   `json:"buildResources,omitempty"` // Resource limits for build pipeline (Kaniko)
 	Replicas    int32               `json:"replicas,omitempty"`
 	Ingresses   []IngressRuleConfig `json:"ingresses,omitempty"` // Multiple domains/paths
 	HealthCheck HealthCheckConfig   `json:"healthCheck,omitempty"`

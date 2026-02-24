@@ -23,6 +23,7 @@ interface AppConfigurationProps {
         imageName: string
         ports: { name?: string; port: number; targetPort: number; protocol?: string }[]
         resources?: { cpu?: string; memory?: string }
+        buildResources?: { cpu?: string; memory?: string }
         healthCheck?: { path?: string; port?: number; initialDelay?: number; timeout?: number }
         domain?: string
         replicas?: number
@@ -37,18 +38,20 @@ interface AppConfigurationProps {
 
 export function AppConfiguration({ appName, namespace, spec }: AppConfigurationProps) {
     const router = useRouter()
-    
-    const [replicas, setReplicas] = useState(spec?.replicas ?? 1)
+
+    const [replicas, setReplicas] = useState(spec?.replicas || 1)
     const [cpu, setCpu] = useState(stripUnits(spec?.resources?.cpu, 'cpu'))
     const [memory, setMemory] = useState(stripUnits(spec?.resources?.memory, 'mem'))
+    const [buildCpu, setBuildCpu] = useState(stripUnits(spec?.buildResources?.cpu, 'cpu'))
+    const [buildMemory, setBuildMemory] = useState(stripUnits(spec?.buildResources?.memory, 'mem'))
     const [hcPath, setHcPath] = useState(spec?.healthCheck?.path ?? "")
     const [hcPort, setHcPort] = useState(spec?.healthCheck?.port ?? 8080)
     const [sourceType, setSourceType] = useState<"branch" | "tag" | "commit">(spec?.source?.type ?? "branch")
     const [sourceValue, setSourceValue] = useState(spec?.source?.value ?? "main")
-    
+
     const [branches, setBranches] = useState<string[]>([])
     const [tags, setTags] = useState<string[]>([])
-    const [commits, setCommits] = useState<{sha: string, message: string}[]>([])
+    const [commits, setCommits] = useState<{ sha: string, message: string }[]>([])
     const [isSearching, setIsSearching] = useState(false)
     const [searchQuery, setSearchValue] = useState("")
     const [isDropdownOpen, setDropdownOpen] = useState(false)
@@ -60,7 +63,7 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
 
     const [updateStrategy, setUpdateStrategy] = useState<"polling" | "webhook">(spec?.updateStrategy?.type ?? "polling")
     const [pollInterval, setPollInterval] = useState(spec?.updateStrategy?.interval ?? "5m")
-    
+
     const [envVars, setEnvVars] = useState<{ key: string; value: string }[]>(() => {
         try {
             return Object.entries(spec?.env || {}).map(([key, value]) => ({ key, value }))
@@ -68,10 +71,10 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
             return []
         }
     })
-    
+
     const [volumes, setVolumes] = useState(spec?.volumes || [])
     const [secretMounts, setSecretMounts] = useState<{ secretName: string; mountPath: string }[]>(spec?.secretMounts || [])
-    
+
     const [isPending, startTransition] = useTransition()
     const [message, setMessage] = useState("")
 
@@ -113,8 +116,8 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
         else if (sourceType === "commit") options = commits.map(c => ({ value: c.sha, label: c.sha.substring(0, 7), sub: c.message }))
 
         if (!searchQuery) return options
-        return options.filter(o => 
-            o.value.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        return options.filter(o =>
+            o.value.toLowerCase().includes(searchQuery.toLowerCase()) ||
             (o.sub && o.sub.toLowerCase().includes(searchQuery.toLowerCase()))
         )
     }, [sourceType, branches, tags, commits, searchQuery])
@@ -176,10 +179,10 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
             if (res.error) {
                 setMessage(`Error: ${res.error}`)
             } else {
-                setSshResult({ 
-                    success: true, 
-                    autoAdded: !!res.autoAdded, 
-                    publicKey: res.publicKey 
+                setSshResult({
+                    success: true,
+                    autoAdded: !!res.autoAdded,
+                    publicKey: res.publicKey
                 })
                 setAuthMethod("ssh")
                 router.refresh()
@@ -199,6 +202,10 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
                 if (key.trim()) env[key.trim()] = value
             })
 
+            const buildRes: { cpu?: string; memory?: string } = {}
+            if (buildCpu.trim()) buildRes.cpu = buildCpu.trim() + "m"
+            if (buildMemory.trim()) buildRes.memory = buildMemory.trim() + "Mi"
+
             const patch = {
                 spec: {
                     replicas,
@@ -206,6 +213,7 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
                         cpu: cpu.trim() + "m",
                         memory: memory.trim() + "Mi",
                     },
+                    buildResources: (buildRes.cpu || buildRes.memory) ? buildRes : undefined,
                     healthCheck: {
                         path: hcPath,
                         port: hcPort,
@@ -215,12 +223,12 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
                         value: sourceValue,
                     },
                     authMethod,
-                    env: Object.keys(env).length > 0 ? env : undefined,
+                    env: env,
                     volumes: volumes.map(v => ({
                         ...v,
                         size: v.size.endsWith('Mi') || v.size.endsWith('Gi') ? v.size : v.size + "Mi"
                     })),
-                    secretMounts: secretMounts.length > 0 ? secretMounts : undefined,
+                    secretMounts: secretMounts,
                     updateStrategy: {
                         type: updateStrategy,
                         interval: pollInterval,
@@ -295,6 +303,33 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
                                     />
                                 </div>
                             </div>
+                            {/* Build Pipeline Resources */}
+                            <div className="border-t pt-4 mt-2">
+                                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">Build Pipeline Limits (optional)</p>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="buildCpu">Build CPU (mCore)</Label>
+                                        <Input
+                                            id="buildCpu"
+                                            placeholder="same as app"
+                                            value={buildCpu}
+                                            onChange={(e) => setBuildCpu(e.target.value)}
+                                            className="h-11 border-2 font-mono"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="buildMemory">Build RAM (MiB)</Label>
+                                        <Input
+                                            id="buildMemory"
+                                            placeholder="same as app"
+                                            value={buildMemory}
+                                            onChange={(e) => setBuildMemory(e.target.value)}
+                                            className="h-11 border-2 font-mono"
+                                        />
+                                    </div>
+                                </div>
+                                <p className="text-[10px] text-muted-foreground mt-1">Leave blank to use app resource limits for builds</p>
+                            </div>
                         </CardContent>
                     </Card>
 
@@ -322,7 +357,7 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
                                     </select>
                                     <ChevronDown className="absolute right-2 top-3.5 h-3 w-3 text-muted-foreground pointer-events-none" />
                                 </div>
-                                
+
                                 {/* Searchable Combobox */}
                                 <div className="relative flex-1" ref={dropdownRef}>
                                     <div className="relative group">
@@ -345,7 +380,7 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
                                                 setDropdownOpen(true)
                                             }}
                                         />
-                                        <div 
+                                        <div
                                             className="absolute right-3 top-3.5 cursor-pointer opacity-50 hover:opacity-100 transition-opacity"
                                             onClick={() => setDropdownOpen(!isDropdownOpen)}
                                         >
@@ -401,9 +436,9 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <Button 
-                                variant="outline" 
-                                className="w-full h-11 gap-2 font-bold" 
+                            <Button
+                                variant="outline"
+                                className="w-full h-11 gap-2 font-bold"
                                 onClick={handleSetupSSH}
                                 disabled={setupLoading}
                             >
@@ -414,19 +449,19 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
                             {sshResult?.success && (
                                 <div className="p-4 rounded-lg bg-background border-2 border-dashed space-y-3 animate-in zoom-in-95">
                                     <div className="flex items-center gap-2 text-xs font-bold text-emerald-600 uppercase">
-                                        <CheckCircle2 className="w-4 h-4" /> 
+                                        <CheckCircle2 className="w-4 h-4" />
                                         {sshResult.autoAdded ? "Auto-configured successfully!" : "Manual setup required"}
                                     </div>
-                                    
+
                                     {!sshResult.autoAdded && sshResult.publicKey && (
                                         <div className="space-y-2">
                                             <p className="text-[10px] text-muted-foreground leading-tight">
-                                                Automatic upload failed (likely disabled in GitHub settings). 
+                                                Automatic upload failed (likely disabled in GitHub settings).
                                                 Please add this Public Key manually to your repository <strong>Settings &gt; Deploy keys</strong>:
                                             </p>
-                                            <textarea 
-                                                readOnly 
-                                                value={sshResult.publicKey} 
+                                            <textarea
+                                                readOnly
+                                                value={sshResult.publicKey}
                                                 className="w-full h-24 p-2 text-[10px] font-mono bg-muted rounded border border-input focus:outline-none"
                                             />
                                             <Button size="sm" variant="secondary" className="w-full text-[10px] h-7" onClick={() => {
@@ -637,8 +672,8 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
                             <CardTitle className="text-sm font-semibold opacity-70 uppercase tracking-wider">Update Strategy</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <RadioGroup 
-                                value={updateStrategy} 
+                            <RadioGroup
+                                value={updateStrategy}
                                 onValueChange={(v: "polling" | "webhook") => setUpdateStrategy(v)}
                                 className="grid grid-cols-1 gap-2"
                             >
@@ -651,14 +686,14 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
                                     <Label htmlFor="webhook-c" className="text-sm font-medium">Webhook Trigger</Label>
                                 </div>
                             </RadioGroup>
-                            
+
                             {updateStrategy === "polling" && (
                                 <div className="pt-2 animate-in slide-in-from-top-1">
                                     <Label className="text-[10px] uppercase font-bold opacity-70 mb-1 block">Interval</Label>
-                                    <Input 
-                                        value={pollInterval} 
-                                        onChange={e => setPollInterval(e.target.value)} 
-                                        className="h-10 font-mono text-sm border-2" 
+                                    <Input
+                                        value={pollInterval}
+                                        onChange={e => setPollInterval(e.target.value)}
+                                        className="h-10 font-mono text-sm border-2"
                                         placeholder="5m"
                                     />
                                 </div>

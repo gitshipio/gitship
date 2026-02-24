@@ -817,7 +817,11 @@ func (r *GitshipAppReconciler) ensureBuildJob(ctx context.Context, gitshipApp *g
 		`, sshUrl)
 	}
 
-	buildResources := resolveResources(gitshipApp.Spec.Resources)
+	buildRes := gitshipApp.Spec.BuildResources
+	if buildRes.CPU == "" && buildRes.Memory == "" {
+		buildRes = gitshipApp.Spec.Resources
+	}
+	buildResources := resolveResources(buildRes)
 
 	newJob := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{

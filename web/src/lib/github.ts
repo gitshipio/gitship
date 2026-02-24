@@ -135,7 +135,8 @@ export async function createRepositoryWebhook(owner: string, repo: string, webho
             config: {
                 url: webhookUrl,
                 content_type: "json",
-                insecure_ssl: "0" // Enforce SSL
+                insecure_ssl: "0",
+                secret: process.env.GITHUB_WEBHOOK_SECRET || "",
             }
         })
     })

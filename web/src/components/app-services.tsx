@@ -227,18 +227,20 @@ export function AppServices({ appName, namespace, initialIngresses, initialPorts
                 ))}
             </div>
         </CardContent>
-        <CardFooter className="bg-muted/10 border-t py-4 flex items-center justify-between">
-            <Button onClick={handleSave} disabled={isPending} className="gap-2 px-8 shadow-lg shadow-primary/20 h-11">
-                {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                Apply Networking Changes
-            </Button>
-            {message && (
-                <span className={`text-sm font-bold animate-in fade-in slide-in-from-right-2 ${message.includes("Error") || message.includes("Failed") ? "text-destructive" : "text-emerald-600"}`}>
-                    {message}
-                </span>
-            )}
-        </CardFooter>
       </Card>
+
+      {/* Shared Save Bar */}
+      <div className="flex items-center justify-between p-4 bg-muted/10 border-2 rounded-2xl">
+          <Button onClick={handleSave} disabled={isPending} className="gap-2 px-8 shadow-lg shadow-primary/20 h-11">
+              {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              Apply Networking Changes
+          </Button>
+          {message && (
+              <span className={`text-sm font-bold animate-in fade-in slide-in-from-right-2 ${message.includes("Error") || message.includes("Failed") ? "text-destructive" : "text-emerald-600"}`}>
+                  {message}
+              </span>
+          )}
+      </div>
 
       {/* 3. Status Overview (Read-Only) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 opacity-80 scale-95 origin-top transition-transform hover:scale-100 duration-500">

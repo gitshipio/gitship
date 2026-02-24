@@ -42,7 +42,12 @@ export function AppLogs({ appName, namespace, history }: AppLogsProps) {
             if (res.ok) {
                 const data = await res.json()
                 setLogs(data.logs || [])
-                setPods(data.pods || [])
+                // Only update pods if the list actually changed (avoid re-render flicker)
+                setPods(prev => {
+                    const next = data.pods || []
+                    if (JSON.stringify(prev) === JSON.stringify(next)) return prev
+                    return next
+                })
                 
                 // Auto-select first pod if none selected
                 if (!selectedPod && data.pod) {

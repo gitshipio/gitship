@@ -19,22 +19,15 @@ export async function PATCH(
     const patchData = await req.json()
     console.log(`[API] PATCH GitshipApp ${name} in ${namespace}:`, JSON.stringify(patchData))
 
-    const patch = []
-    
+    // Build JSON Patch operations for every spec field sent by the frontend.
+    // Uses "add" op which creates the path if missing, or replaces if it exists.
+    const patch: { op: string; path: string; value: unknown }[] = []
+
     if (patchData.spec) {
-      if (patchData.spec.resources) {
-        patch.push({
-          op: "replace",
-          path: "/spec/resources",
-          value: patchData.spec.resources,
-        })
-      }
-      if (patchData.spec.replicas !== undefined) {
-        patch.push({
-          op: "replace",
-          path: "/spec/replicas",
-          value: patchData.spec.replicas,
-        })
+      for (const [key, value] of Object.entries(patchData.spec)) {
+        if (value !== undefined) {
+          patch.push({ op: "add", path: `/spec/${key}`, value })
+        }
       }
     }
 
@@ -47,9 +40,9 @@ export async function PATCH(
       plural: "gitshipapps",
       name,
       body: patch,
-    }, { 
+    }, {
       // @ts-expect-error custom headers for JSON Patch
-      headers: { "Content-Type": "application/json-patch+json" } 
+      headers: { "Content-Type": "application/json-patch+json" }
     })
 
     console.log(`[API] SUCCESS: Patched GitshipApp ${name} in ${namespace}`)
@@ -64,3 +57,4 @@ export async function PATCH(
     )
   }
 }
+

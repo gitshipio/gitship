@@ -8,7 +8,7 @@ import { createApp } from "./actions"
 import { useState, useMemo, useRef, useEffect, useTransition } from "react"
 import { GitHubRepo } from "@/lib/github"
 import { RegistryConfig } from "@/lib/types"
-import { Search, Globe, Lock, Check, Loader2, ChevronDown, Settings2, ArrowRight, Github, Database, Trash2, Plus, Clock, GitBranch, Tag, Hash, AlertCircle } from "lucide-react"
+import { Search, Globe, Lock, Check, Loader2, ChevronDown, Settings2, ArrowRight, Github, Database, Trash2, Plus, Clock, GitBranch, Tag, Hash, AlertCircle, Link2 } from "lucide-react"
 import { cn, stripUnits } from "@/lib/utils"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 
@@ -31,6 +31,8 @@ export function NewAppForm({ repos = [], registries = [] }: { repos?: GitHubRepo
   const [selectedRegistry, setSelectedRegistry] = useState<string>("internal")
   const [isOpen, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const [repoMode, setRepoMode] = useState<"connected" | "custom">(repos.length > 0 ? "connected" : "custom")
+  const [customUrl, setCustomUrl] = useState("")
   
   // Phase 2 State
   const [isDetected, setIsDetected] = useState(false)
@@ -58,6 +60,9 @@ export function NewAppForm({ repos = [], registries = [] }: { repos?: GitHubRepo
   const [volumes, setVolumes] = useState<{ name: string; mountPath: string; size: string }[]>([])
   const [updateStrategy, setUpdateStrategy] = useState<"polling" | "webhook">("polling")
   const [pollInterval, setPollInterval] = useState("5m")
+  const [buildCpu, setBuildCpu] = useState("")
+  const [buildMemory, setBuildMemory] = useState("")
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
   const addPortMapping = () => setPorts([...ports, { name: "", port: 80, targetPort: 80, protocol: "TCP" }])
   const removePortMapping = (idx: number) => setPorts(ports.filter((_, i) => i !== idx))
@@ -197,70 +202,131 @@ export function NewAppForm({ repos = [], registries = [] }: { repos?: GitHubRepo
                     <CardDescription>Select the repository you want to deploy to the cluster.</CardDescription>
                 </CardHeader>
                 <CardContent className="pt-8 space-y-8 overflow-visible">
+                    {/* Repo Mode Toggle */}
+                    <div className="flex gap-2 p-1 bg-muted/50 rounded-lg w-fit">
+                        <button
+                            type="button"
+                            className={cn(
+                                "px-4 py-2 text-sm font-semibold rounded-md transition-all",
+                                repoMode === "connected" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+                            )}
+                            onClick={() => setRepoMode("connected")}
+                        >
+                            <Github className="w-4 h-4 inline mr-2" />Connected Repos
+                        </button>
+                        <button
+                            type="button"
+                            className={cn(
+                                "px-4 py-2 text-sm font-semibold rounded-md transition-all",
+                                repoMode === "custom" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+                            )}
+                            onClick={() => setRepoMode("custom")}
+                        >
+                            <Link2 className="w-4 h-4 inline mr-2" />Custom URL
+                        </button>
+                    </div>
+
                     <div className="grid gap-8 md:grid-cols-3 overflow-visible">
                         <div className="md:col-span-2 space-y-2 relative" ref={containerRef}>
                             <Label htmlFor="repoSearch" className="text-sm font-bold uppercase tracking-wider opacity-70">Git Repository</Label>
-                            <div className="relative group">
-                                <Search className="absolute left-3.5 top-3.5 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                                <Input
-                                    id="repoSearch"
-                                    placeholder="Search repositories or paste custom URL..."
-                                    className="pl-11 h-12 text-base border-2 focus-visible:ring-primary/20"
-                                    value={searchValue}
-                                    onChange={(e) => {
-                                        setSearchValue(e.target.value)
-                                        setRepoUrl(e.target.value)
-                                        setOpen(true)
-                                    }}
-                                    onFocus={() => setOpen(true)}
-                                    autoComplete="off"
-                                />
-                                {isDetecting && (
-                                    <div className="absolute right-3.5 top-3.5">
-                                        <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                                    </div>
-                                )}
-                            </div>
-                            
-                            <input type="hidden" name="repoUrl" value={repoUrl} />
 
-                            {isOpen && (searchValue || repos.length > 0) && (
-                                <div className="absolute z-[100] w-[120%] -left-[10%] mt-2 bg-popover text-popover-foreground border-2 rounded-xl shadow-2xl max-h-[500px] overflow-auto animate-in fade-in zoom-in-95 duration-200">
-                                    <div className="p-2">
-                                        {filteredRepos.map((repo) => (
-                                            <div
-                                                key={repo.id}
-                                                className={cn(
-                                                    "relative flex cursor-pointer select-none items-center rounded-lg px-4 py-3 text-sm outline-none hover:bg-accent hover:text-accent-foreground transition-all mb-1 last:mb-0",
-                                                    repoUrl === repo.html_url && "bg-accent border-l-4 border-l-primary pl-3"
-                                                )}
-                                                onClick={() => selectRepo(repo.html_url, repo.full_name)}
-                                            >
-                                                <div className={cn(
-                                                    "mr-4 h-10 w-10 rounded-md flex items-center justify-center border shrink-0",
-                                                    repo.private ? "bg-amber-500/10 border-amber-500/20 text-amber-600" : "bg-primary/10 border-primary/20 text-primary"
-                                                )}>
-                                                    {repo.private ? <Lock className="h-5 w-5" /> : <Globe className="h-5 w-5" />}
-                                                </div>
-                                                <div className="flex flex-col gap-0.5 overflow-hidden">
-                                                    <span className="font-bold text-base truncate">{repo.full_name}</span>
-                                                    <span className="text-xs opacity-60 truncate font-mono">{repo.html_url}</span>
-                                                </div>
-                                                {repoUrl === repo.html_url && <Check className="ml-auto h-5 w-5 text-primary" />}
-                                            </div>
-                                        ))}
-                                        {searchValue && !repos.find(r => r.html_url === searchValue) && (
-                                            <div
-                                                className="flex cursor-pointer items-center rounded-lg px-4 py-5 text-sm hover:bg-primary/10 text-primary font-bold border-t-2 border-dashed mt-2"
-                                                onClick={() => selectRepo(searchValue)}
-                                            >
-                                                <ArrowRight className="mr-3 h-5 w-5 animate-pulse" />
-                                                Connect custom URL: <span className="ml-2 font-mono opacity-80">{searchValue}</span>
+                            {repoMode === "custom" ? (
+                                /* Custom URL Mode */
+                                <div className="space-y-3">
+                                    <div className="relative group">
+                                        <Link2 className="absolute left-3.5 top-3.5 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                                        <Input
+                                            id="repoSearch"
+                                            placeholder="https://github.com/user/repo.git or git@github.com:user/repo.git"
+                                            className="pl-11 h-12 text-base border-2 focus-visible:ring-primary/20 font-mono"
+                                            value={customUrl}
+                                            onChange={(e) => {
+                                                setCustomUrl(e.target.value)
+                                                setRepoUrl(e.target.value)
+                                            }}
+                                            onBlur={() => {
+                                                if (customUrl && !isDetected) {
+                                                    selectRepo(customUrl)
+                                                }
+                                            }}
+                                            autoComplete="off"
+                                        />
+                                        {isDetecting && (
+                                            <div className="absolute right-3.5 top-3.5">
+                                                <Loader2 className="h-5 w-5 animate-spin text-primary" />
                                             </div>
                                         )}
                                     </div>
+                                    <p className="text-[10px] text-muted-foreground">Enter any Git repository URL — public or private. SSH and HTTPS formats supported.</p>
                                 </div>
+                            ) : (
+                                /* Connected Repos Mode */
+                                <>
+                                <div className="relative group">
+                                    <Search className="absolute left-3.5 top-3.5 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                                    <Input
+                                        id="repoSearch"
+                                        placeholder="Search repositories or paste custom URL..."
+                                        className="pl-11 h-12 text-base border-2 focus-visible:ring-primary/20"
+                                        value={searchValue}
+                                        onChange={(e) => {
+                                            setSearchValue(e.target.value)
+                                            setRepoUrl(e.target.value)
+                                            setOpen(true)
+                                        }}
+                                        onFocus={() => setOpen(true)}
+                                        autoComplete="off"
+                                    />
+                                    {isDetecting && (
+                                        <div className="absolute right-3.5 top-3.5">
+                                            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                                        </div>
+                                    )}
+                                </div>
+                                
+                                <input type="hidden" name="repoUrl" value={repoUrl} />
+
+                                {isOpen && (searchValue || repos.length > 0) && (
+                                    <div className="absolute z-[100] w-[120%] -left-[10%] mt-2 bg-popover text-popover-foreground border-2 rounded-xl shadow-2xl max-h-[500px] overflow-auto animate-in fade-in zoom-in-95 duration-200">
+                                        <div className="p-2">
+                                            {filteredRepos.map((repo) => (
+                                                <div
+                                                    key={repo.id}
+                                                    className={cn(
+                                                        "relative flex cursor-pointer select-none items-center rounded-lg px-4 py-3 text-sm outline-none hover:bg-accent hover:text-accent-foreground transition-all mb-1 last:mb-0",
+                                                        repoUrl === repo.html_url && "bg-accent border-l-4 border-l-primary pl-3"
+                                                    )}
+                                                    onClick={() => selectRepo(repo.html_url, repo.full_name)}
+                                                >
+                                                    <div className={cn(
+                                                        "mr-4 h-10 w-10 rounded-md flex items-center justify-center border shrink-0",
+                                                        repo.private ? "bg-amber-500/10 border-amber-500/20 text-amber-600" : "bg-primary/10 border-primary/20 text-primary"
+                                                    )}>
+                                                        {repo.private ? <Lock className="h-5 w-5" /> : <Globe className="h-5 w-5" />}
+                                                    </div>
+                                                    <div className="flex flex-col gap-0.5 overflow-hidden">
+                                                        <span className="font-bold text-base truncate">{repo.full_name}</span>
+                                                        <span className="text-xs opacity-60 truncate font-mono">{repo.html_url}</span>
+                                                    </div>
+                                                    {repoUrl === repo.html_url && <Check className="ml-auto h-5 w-5 text-primary" />}
+                                                </div>
+                                            ))}
+                                            {searchValue && !repos.find(r => r.html_url === searchValue) && (
+                                                <div
+                                                    className="flex cursor-pointer items-center rounded-lg px-4 py-5 text-sm hover:bg-primary/10 text-primary font-bold border-t-2 border-dashed mt-2"
+                                                    onClick={() => selectRepo(searchValue)}
+                                                >
+                                                    <ArrowRight className="mr-3 h-5 w-5 animate-pulse" />
+                                                    Connect custom URL: <span className="ml-2 font-mono opacity-80">{searchValue}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                                </>
                             )}
+
+                            <input type="hidden" name="repoUrl" value={repoUrl} />
                         </div>
 
                         <div className="space-y-2">
@@ -319,6 +385,28 @@ export function NewAppForm({ repos = [], registries = [] }: { repos?: GitHubRepo
                                     <Input id="memory" name="memory" value={memory} onChange={e => setMemory(e.target.value)} className="h-12 border-2 font-mono" placeholder="1024" />
                                 </div>
                             </div>
+
+                            {/* Advanced Build Settings */}
+                            <button
+                                type="button"
+                                className="text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                                onClick={() => setShowAdvanced(!showAdvanced)}
+                            >
+                                <ChevronDown className={cn("w-3 h-3 transition-transform", showAdvanced && "rotate-180")} />
+                                Advanced Build Settings
+                            </button>
+                            {showAdvanced && (
+                                <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2 duration-200">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="buildCpu" className="text-sm font-semibold">Build CPU (mCore)</Label>
+                                        <Input id="buildCpu" name="buildCpu" value={buildCpu} onChange={e => setBuildCpu(e.target.value)} className="h-12 border-2 font-mono" placeholder="same as app" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="buildMemory" className="text-sm font-semibold">Build RAM (MiB)</Label>
+                                        <Input id="buildMemory" name="buildMemory" value={buildMemory} onChange={e => setBuildMemory(e.target.value)} className="h-12 border-2 font-mono" placeholder="same as app" />
+                                    </div>
+                                </div>
+                            )}
 
                             <div className="space-y-2">
                                 <Label className="text-sm font-semibold">Deployment Source</Label>

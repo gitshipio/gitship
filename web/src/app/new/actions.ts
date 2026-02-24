@@ -30,6 +30,8 @@ const createAppSchema = z.object({
   domain: z.string().optional(),
   cpu: z.string().default("500"),
   memory: z.string().default("1024"),
+  buildCpu: z.string().optional().default(""),
+  buildMemory: z.string().optional().default(""),
   registrySecretRef: z.string().optional(),
   updateStrategy: z.enum(["polling", "webhook"]).optional().default("polling"),
   pollInterval: z.string().optional().default("5m"),
@@ -66,6 +68,8 @@ export async function createApp(formData: FormData) {
     domain: formData.get("domain"),
     cpu: formData.get("cpu") || "500",
     memory: formData.get("memory") || "1024",
+    buildCpu: formData.get("buildCpu") || "",
+    buildMemory: formData.get("buildMemory") || "",
     registrySecretRef: formData.get("registrySecretRef"),
     updateStrategy: formData.get("updateStrategy"),
     pollInterval: formData.get("pollInterval"),
@@ -142,6 +146,12 @@ export async function createApp(formData: FormData) {
         cpu: data.cpu.trim() + "m",
         memory: data.memory.trim() + "Mi",
       },
+      ...(data.buildCpu || data.buildMemory ? {
+        buildResources: {
+          ...(data.buildCpu ? { cpu: data.buildCpu.trim() + "m" } : {}),
+          ...(data.buildMemory ? { memory: data.buildMemory.trim() + "Mi" } : {}),
+        }
+      } : {}),
       ingresses: data.domain ? [{
           host: data.domain,
           path: "/",

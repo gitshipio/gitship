@@ -47,6 +47,14 @@ spec:
               value: {{ .Values.controller.config.images.git | quote }}
             - name: IMAGE_KANIKO
               value: {{ .Values.controller.config.images.kaniko | quote }}
+            {{- if .Values.github.webhookSecret }}
+            - name: GITHUB_WEBHOOK_SECRET
+              value: {{ .Values.github.webhookSecret | quote }}
+            {{- end }}
+          ports:
+            - containerPort: 3001
+              name: webhook
+              protocol: TCP
           resources:
             limits:
               cpu: 500m
@@ -60,3 +68,20 @@ kind: ServiceAccount
 metadata:
   name: {{ include "gitship.fullname" . }}-controller-manager
   namespace: {{ .Release.Namespace }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "gitship.fullname" . }}-controller-manager-webhook
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ include "gitship.name" . }}-controller
+spec:
+  selector:
+    app: {{ include "gitship.name" . }}-controller
+  ports:
+    - protocol: TCP
+      port: 3001
+      targetPort: 3001
+      name: webhook
+  type: ClusterIP
