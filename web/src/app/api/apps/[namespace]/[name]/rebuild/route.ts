@@ -1,70 +1,41 @@
-import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { k8sCustomApi } from "@/lib/k8s"
+import { NextResponse } from "next/server"
 import { hasNamespaceAccess } from "@/lib/auth-utils"
 
 export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ namespace: string; name: string }> }
+  req: Request,
+  { params }: { params: Promise<{ namespace: string, name: string }> }
 ) {
   const session = await auth()
   const { namespace, name } = await params
 
-  // Security Check
-  if (!await hasNamespaceAccess(namespace, session)) {
-    return NextResponse.json({ error: "Access Denied" }, { status: 403 })
+  if (!(await hasNamespaceAccess(namespace, session))) {
+    return new NextResponse("Unauthorized", { status: 401 })
   }
 
   try {
-    // Get the current state to see if annotations exist
-    const response = await k8sCustomApi.getNamespacedCustomObject({
-      group: "gitship.io",
-      version: "v1alpha1",
-      namespace,
-      plural: "gitshipapps",
-      name,
-    })
-    const app = response.body || response
-
-    const patch = []
-    
-    // If annotations don't exist, we must add the object first
-    if (!app.metadata.annotations) {
-      patch.push({
-        op: "add",
-        path: "/metadata/annotations",
-        value: { "gitship.io/rebuild": new Date().toISOString() }
-      })
-    } else {
-      // Annotations exist, we can just add/replace the specific key
-      // In JSON Patch, 'add' on an existing object key acts as 'replace'
-      patch.push({
-        op: "add",
-        path: "/metadata/annotations/gitship.io~1rebuild",
-        value: new Date().toISOString(),
-      })
+    const patch = {
+        spec: {
+            rebuildToken: Date.now().toString()
+        }
     }
 
-    await k8sCustomApi.patchNamespacedCustomObject({
-      group: "gitship.io",
-      version: "v1alpha1",
-      namespace,
-      plural: "gitshipapps",
-      name,
-      body: patch,
-    }, { 
-      // @ts-expect-error custom headers for JSON Patch
-      headers: { "Content-Type": "application/json-patch+json" } 
+    await k8sCustomApi.patchClusterCustomObject({
+        group: "gitship.io",
+        version: "v1alpha1",
+        namespace,
+        plural: "gitshipapps",
+        name,
+        body: patch
+    }, {
+        // @ts-expect-error custom headers
+        headers: { "Content-Type": "application/merge-patch+json" }
     })
 
     return NextResponse.json({ ok: true })
-  } catch (e: unknown) {
-    // @ts-expect-error dynamic access
-    console.error("Failed to trigger rebuild:", e.body?.message || e.message)
-    return NextResponse.json(
-      // @ts-expect-error dynamic access
-      { error: e.body?.message || e.message },
-      { status: 500 }
-    )
+  } catch (e: any) {
+    console.error("[API] Failed to trigger rebuild:", e.body?.message || e.message)
+    return NextResponse.json({ error: e.body?.message || e.message }, { status: 500 })
   }
 }
