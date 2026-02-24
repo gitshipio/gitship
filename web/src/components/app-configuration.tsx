@@ -7,11 +7,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Trash2, Plus, Save, Database, GitBranch, Tag, Hash, ChevronDown, Key, Loader2, CheckCircle2, Check, Activity } from "lucide-react"
+import { Trash2, Plus, Save, Database, GitBranch, Tag, Hash, ChevronDown, Key, Loader2, CheckCircle2, Check, Activity, Globe, Shield, ShieldCheck, ShieldAlert, RefreshCw } from "lucide-react"
 import { cn, stripUnits } from "@/lib/utils"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { AppSecrets } from "./app-secrets"
 import { setupAppSSH } from "@/app/actions/secrets"
+import { IngressRuleConfig } from "@/lib/types"
 
 interface AppConfigurationProps {
     appName: string
@@ -64,6 +65,13 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
     const [updateStrategy, setUpdateStrategy] = useState<"polling" | "webhook">(spec?.updateStrategy?.type ?? "polling")
     const [pollInterval, setPollInterval] = useState(spec?.updateStrategy?.interval ?? "5m")
 
+    const [rebuildToken, setRebuildToken] = useState(spec?.rebuildToken || "")
+    const [isRebuilding, setIsRebuilding] = useState(false)
+
+    const [ingresses, setIngresses] = useState<IngressRuleConfig[]>(spec?.ingresses || [])
+    const [isTlsEnabled, setIsTlsEnabled] = useState(spec?.tls?.enabled || false)
+    const [hasCertManager, setHasCertManager] = useState(false)
+
     const [envVars, setEnvVars] = useState<{ key: string; value: string }[]>(() => {
         try {
             return Object.entries(spec?.env || {}).map(([key, value]) => ({ key, value }))
@@ -77,6 +85,22 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
 
     const [isPending, startTransition] = useTransition()
     const [message, setMessage] = useState("")
+
+    useEffect(() => {
+        const checkCertManager = async () => {
+            try {
+                const res = await fetch(`/api/integrations?namespace=${namespace}`)
+                if (res.ok) {
+                    const data = await res.json()
+                    const cm = data.items?.find((i: any) => i.spec.type === "cert-manager" && i.spec.enabled)
+                    setHasCertManager(!!cm)
+                }
+            } catch (err) {
+                console.error("Failed to check cert-manager integration:", err)
+            }
+        }
+        checkCertManager()
+    }, [namespace])
 
     useEffect(() => {
         const fetchRepoInfo = async () => {
@@ -233,6 +257,11 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
                         type: updateStrategy,
                         interval: pollInterval,
                     },
+                    ingresses: ingresses,
+                    tls: {
+                        enabled: isTlsEnabled,
+                    },
+                    rebuildToken: rebuildToken,
                 },
             }
 
@@ -701,6 +730,141 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
                         </CardContent>
                     </Card>
                 </div>
+            </section>
+
+            {/* 5. Ingress & TLS */}
+            <section className="space-y-4">
+                <h3 className="text-lg font-bold flex items-center gap-2 px-1">
+                    <Globe className="w-5 h-5 text-primary" />
+                    Domains & HTTPS
+                </h3>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between border-b py-4">
+                        <div>
+                            <CardTitle className="text-sm font-semibold opacity-70 uppercase tracking-wider">Ingress Rules</CardTitle>
+                            <CardDescription className="text-[10px]">Map external domains to your app's ports.</CardDescription>
+                        </div>
+                        <Button size="sm" variant="outline" onClick={() => setIngresses([...ingresses, { host: "", path: "/", servicePort: 80 }])}>
+                            <Plus className="w-3.5 h-3.5 mr-1" /> Add Domain
+                        </Button>
+                    </CardHeader>
+                    <CardContent className="pt-6 space-y-4">
+                        {ingresses.length === 0 && (
+                            <p className="text-sm text-muted-foreground italic text-center py-4">No domains configured. App will be internal only.</p>
+                        )}
+                        {ingresses.map((ing, idx) => (
+                            <div key={idx} className="grid grid-cols-1 md:grid-cols-3 gap-3 p-4 border-2 rounded-xl bg-muted/5 relative group animate-in zoom-in-95">
+                                <div className="space-y-1.5 md:col-span-2">
+                                    <Label className="text-[10px] uppercase font-bold opacity-70">Domain / Host</Label>
+                                    <Input
+                                        placeholder="myapp.com"
+                                        value={ing.host}
+                                        onChange={(e) => {
+                                            const updated = [...ingresses]
+                                            updated[idx].host = e.target.value
+                                            setIngresses(updated)
+                                        }}
+                                        className="h-10 text-sm font-mono bg-background"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="text-[10px] uppercase font-bold opacity-70">Target Port</Label>
+                                    <div className="flex items-center gap-2">
+                                        <Input
+                                            type="number"
+                                            value={ing.servicePort}
+                                            onChange={(e) => {
+                                                const updated = [...ingresses]
+                                                updated[idx].servicePort = parseInt(e.target.value) || 80
+                                                setIngresses(updated)
+                                            }}
+                                            className="h-10 text-sm font-mono bg-background"
+                                        />
+                                        <Button size="icon" variant="ghost" className="h-10 w-10 shrink-0 text-destructive hover:bg-destructive/10" onClick={() => setIngresses(ingresses.filter((_, i) => i !== idx))}>
+                                            <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+
+                        <div className="pt-4 border-t flex flex-col md:flex-row gap-6">
+                            <div className="flex-1 space-y-2">
+                                <div className="flex items-center gap-2">
+                                    <Label className="text-sm font-bold flex items-center gap-2">
+                                        Enable HTTPS (TLS)
+                                        {isTlsEnabled ? <ShieldCheck className="w-4 h-4 text-emerald-500" /> : <Shield className="w-4 h-4 text-muted-foreground" />}
+                                    </Label>
+                                    <input
+                                        type="checkbox"
+                                        checked={isTlsEnabled}
+                                        disabled={!hasCertManager}
+                                        onChange={(e) => setIsTlsEnabled(e.target.checked)}
+                                        className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                    />
+                                </div>
+                                <p className="text-[11px] text-muted-foreground">
+                                    Secure your domains with Let's Encrypt certificates automatically.
+                                </p>
+                            </div>
+                            <div className="flex-1">
+                                {!hasCertManager ? (
+                                    <div className="p-3 rounded-lg bg-amber-500/10 border-2 border-amber-500/20 flex gap-3 items-start animate-in slide-in-from-right-4">
+                                        <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                                        <div>
+                                            <p className="text-xs font-bold text-amber-700">Cert-Manager Integration Required</p>
+                                            <p className="text-[10px] text-amber-600 leading-tight mt-1">
+                                                Go to <strong>Settings</strong> and install the Cert-Manager integration to enable HTTPS for your apps.
+                                            </p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="p-3 rounded-lg bg-emerald-500/10 border-2 border-emerald-500/20 flex gap-3 items-start">
+                                        <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                                        <div>
+                                            <p className="text-xs font-bold text-emerald-700">Cert-Manager Active</p>
+                                            <p className="text-[10px] text-emerald-600 leading-tight mt-1">
+                                                Your namespace is configured for SSL. Certificates will be provisioned once you save.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            </section>
+
+            {/* 6. Danger Zone */}
+            <section className="space-y-4 pt-10">
+                <h3 className="text-lg font-bold flex items-center gap-2 px-1 text-destructive">
+                    <RefreshCw className="w-5 h-5" />
+                    Danger Zone
+                </h3>
+                <Card className="border-destructive/20 bg-destructive/5">
+                    <CardContent className="pt-6 flex flex-col md:flex-row items-center justify-between gap-6">
+                        <div className="space-y-1 text-center md:text-left">
+                            <h4 className="font-bold text-destructive">Force Rebuild & Resync</h4>
+                            <p className="text-xs text-muted-foreground max-w-md">
+                                This will bypass the cache, pull fresh source code from GitHub, rebuild the container image, and redeploy your app.
+                            </p>
+                        </div>
+                        <Button 
+                            variant="destructive" 
+                            className="shrink-0 font-bold px-8 h-11 shadow-lg shadow-destructive/20"
+                            disabled={isRebuilding}
+                            onClick={() => {
+                                setIsRebuilding(true)
+                                setRebuildToken(Date.now().toString())
+                                setMessage("Rebuild triggered! Click Save to confirm.")
+                                setTimeout(() => setIsRebuilding(false), 2000)
+                            }}
+                        >
+                            {isRebuilding ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+                            Trigger Fresh Rebuild
+                        </Button>
+                    </CardContent>
+                </Card>
             </section>
 
             {/* Global Actions Bar */}
