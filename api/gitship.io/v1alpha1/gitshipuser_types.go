@@ -47,6 +47,12 @@ type UserQuotas struct {
 	Pods string `json:"pods,omitempty"`
 	// Maximum Storage (e.g. "10Gi")
 	Storage string `json:"storage,omitempty"`
+
+	// Account-wide build resources
+	// +kubebuilder:default:="1"
+	BuildCPU string `json:"buildCPU,omitempty"`
+	// +kubebuilder:default:="2Gi"
+	BuildMemory string `json:"buildMemory,omitempty"`
 }
 
 type RegistryConfig struct {
