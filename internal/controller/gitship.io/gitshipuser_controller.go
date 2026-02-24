@@ -95,23 +95,45 @@ func (r *GitshipUserReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	for _, reg := range gitshipUser.Spec.Registries {
 		if err := r.ensureRegistrySecret(ctx, nsName, reg); err != nil {
 			log.Error(err, "Failed to sync registry secret", "namespace", nsName, "registry", reg.Name)
+			return ctrl.Result{}, err
 		}
 	}
 
 	// Ensure ResourceQuotas exist
 	if err := r.ensureResourceQuota(ctx, nsName, gitshipUser.Spec.Quotas); err != nil {
 		log.Error(err, "Failed to sync resource quota", "namespace", nsName)
+		return ctrl.Result{}, err
 	}
 
 	// Ensure NetworkPolicy exists
 	if err := r.ensureNetworkPolicy(ctx, nsName); err != nil {
 		log.Error(err, "Failed to sync network policy", "namespace", nsName)
+		return ctrl.Result{}, err
 	}
 
-	// Ensure Cert-Manager Issuer exists if email is provided
-	if gitshipUser.Spec.Email != "" {
-		if err := r.ensureIssuer(ctx, nsName, gitshipUser.Spec.Email); err != nil {
+	// Ensure Cert-Manager Issuer exists if integration is enabled
+	integrations := &gitshipiov1alpha1.GitshipIntegrationList{}
+	hasCertManager := false
+	if err := r.List(ctx, integrations, client.InNamespace(nsName)); err == nil {
+		for _, integration := range integrations.Items {
+			if strings.ToLower(integration.Spec.Type) == "cert-manager" && integration.Spec.Enabled {
+				hasCertManager = true
+				break
+			}
+		}
+	}
+
+	if hasCertManager && gitshipUser.Spec.Email != "" {
+		if err := r.ensureIssuer(ctx, nsName, gitshipUser.Spec.Email, gitshipUser); err != nil {
 			log.Error(err, "Failed to sync issuer", "namespace", nsName)
+			return ctrl.Result{}, err
+		}
+	} else if !hasCertManager {
+		// Cleanup issuer if integration is removed
+		issuer := &cmv1.Issuer{}
+		if err := r.Get(ctx, client.ObjectKey{Namespace: nsName, Name: "letsencrypt-prod"}, issuer); err == nil {
+			log.Info("Cleaning up Issuer as integration is disabled/missing", "namespace", nsName)
+			_ = r.Delete(ctx, issuer)
 		}
 	}
 
@@ -300,7 +322,7 @@ func (r *GitshipUserReconciler) ensureNetworkPolicy(ctx context.Context, namespa
 	return r.Create(ctx, newPolicy)
 }
 
-func (r *GitshipUserReconciler) ensureIssuer(ctx context.Context, namespace string, email string) error {
+func (r *GitshipUserReconciler) ensureIssuer(ctx context.Context, namespace string, email string, gitshipUser *gitshipiov1alpha1.GitshipUser) error {
 	issuerName := "letsencrypt-prod"
 	issuer := &cmv1.Issuer{}
 	err := r.Get(ctx, client.ObjectKey{Namespace: namespace, Name: issuerName}, issuer)
@@ -344,6 +366,9 @@ func (r *GitshipUserReconciler) ensureIssuer(ctx context.Context, namespace stri
 			},
 			Spec: spec,
 		}
+		if err := ctrl.SetControllerReference(gitshipUser, newIssuer, r.Scheme); err != nil {
+			return err
+		}
 		return r.Create(ctx, newIssuer)
 	}
 
@@ -360,6 +385,7 @@ func (r *GitshipUserReconciler) ensureIssuer(ctx context.Context, namespace stri
 func (r *GitshipUserReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&gitshipiov1alpha1.GitshipUser{}).
+		Owns(&cmv1.Issuer{}).
 		Named("gitship.io-gitshipuser").
 		Complete(r)
 }

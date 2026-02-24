@@ -84,6 +84,7 @@ type GitshipAppReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=services;secrets;pods;persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses;networkpolicies,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=cert-manager.io,resources=issuers,verbs=get;list;watch
 
 func (r *GitshipAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.WithValues("gitshipapp", req.NamespacedName)
@@ -100,7 +101,9 @@ func (r *GitshipAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	log.Info("Resolved latest commit", "commit", latestCommit, "source", gitshipApp.Spec.Source.Type, "value", gitshipApp.Spec.Source.Value)
 
-	if gitshipApp.Status.LatestBuildID == latestCommit {
+	isRebuild := gitshipApp.Spec.RebuildToken != "" && gitshipApp.Spec.RebuildToken != gitshipApp.Status.LatestRebuildToken
+
+	if gitshipApp.Status.LatestBuildID == latestCommit && !isRebuild {
 		// 0. Resolve Image
 		_, image := r.resolveImageNames(gitshipApp, latestCommit)
 
@@ -141,9 +144,13 @@ func (r *GitshipAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{RequeueAfter: requeueAfter}, nil
 	}
 
-	log.Info("New commit detected", "commit", latestCommit, "old", gitshipApp.Status.LatestBuildID)
+	log.Info("Build trigger detected", "commit", latestCommit, "rebuild", isRebuild)
 
 	jobName := fmt.Sprintf("%s-build-%s", gitshipApp.Name, latestCommit[:7])
+	if isRebuild {
+		jobName = fmt.Sprintf("%s-rebuild-%s", gitshipApp.Name, time.Now().Format("02150405")) // unique name for rebuild
+	}
+
 	job := &batchv1.Job{}
 	err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: gitshipApp.Namespace}, job)
 	if err != nil && client.IgnoreNotFound(err) != nil {
@@ -151,11 +158,14 @@ func (r *GitshipAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	if err != nil {
-		if err := r.ensureBuildJob(ctx, gitshipApp, jobName, latestCommit, privateKey); err != nil {
+		if err := r.ensureBuildJob(ctx, gitshipApp, jobName, latestCommit, privateKey, isRebuild); err != nil {
 			return ctrl.Result{}, err
 		}
 	} else if job.Status.Succeeded > 0 {
 		log.Info("Build Job succeeded, recording and re-reconciling")
+		if isRebuild {
+			gitshipApp.Status.LatestRebuildToken = gitshipApp.Spec.RebuildToken
+		}
 		r.recordBuild(gitshipApp, latestCommit, "Succeeded", "Build completed successfully")
 		return ctrl.Result{Requeue: true}, nil
 	} else if job.Status.Failed > 0 {
@@ -304,7 +314,7 @@ func (r *GitshipAppReconciler) ensureIngress(ctx context.Context, gitshipApp *gi
 			// Local issuer exists -> Use it
 			annotations["cert-manager.io/issuer"] = "letsencrypt-prod"
 		} else {
-			// No local issuer -> No certificate. We don't want a global fallback.
+			// No local issuer -> No certificate.
 			log.Info("Skipping certificate issuance: no local 'letsencrypt-prod' issuer found in namespace", "namespace", gitshipApp.Namespace)
 		}
 	}
@@ -746,8 +756,8 @@ func (r *GitshipAppReconciler) resolveAuthAndCommit(ctx context.Context, gitship
 	return latestCommit, privateKey, githubToken, nil
 }
 
-func (r *GitshipAppReconciler) ensureBuildJob(ctx context.Context, gitshipApp *gitshipiov1alpha1.GitshipApp, jobName, latestCommit, privateKey string) error {
-	log.Info("New commit detected", "commit", latestCommit, "old", gitshipApp.Status.LatestBuildID)
+func (r *GitshipAppReconciler) ensureBuildJob(ctx context.Context, gitshipApp *gitshipiov1alpha1.GitshipApp, jobName, latestCommit, privateKey string, isRebuild bool) error {
+	log.Info("Starting build job", "job", jobName, "rebuild", isRebuild)
 
 	pushImage, _ := r.resolveImageNames(gitshipApp, latestCommit)
 	cacheRepo := strings.Split(pushImage, ":")[0] + "-cache"
@@ -756,8 +766,36 @@ func (r *GitshipAppReconciler) ensureBuildJob(ctx context.Context, gitshipApp *g
 		"--dockerfile=Dockerfile",
 		"--context=dir:///workspace",
 		"--destination=" + pushImage,
-		"--cache=true",
-		"--cache-repo=" + cacheRepo,
+	}
+
+	if !isRebuild {
+		kanikoArgs = append(kanikoArgs, "--cache=true", "--cache-repo="+cacheRepo)
+	}
+
+	// Fetch account-wide build quotas from GitshipUser
+	userID := strings.TrimPrefix(gitshipApp.Namespace, "gitship-")
+	user := &gitshipiov1alpha1.GitshipUser{}
+	buildCPU := "1"
+	buildMemory := "2Gi"
+
+	if err := r.Get(ctx, types.NamespacedName{Name: userID}, user); err == nil {
+		if user.Spec.Quotas.BuildCPU != "" {
+			buildCPU = user.Spec.Quotas.BuildCPU
+		}
+		if user.Spec.Quotas.BuildMemory != "" {
+			buildMemory = user.Spec.Quotas.BuildMemory
+		}
+	}
+
+	buildResources := corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse(buildCPU),
+			corev1.ResourceMemory: resource.MustParse(buildMemory),
+		},
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse(fmt.Sprintf("%dm", resource.MustParse(buildCPU).MilliValue()/2)),
+			corev1.ResourceMemory: resource.MustParse(fmt.Sprintf("%d", resource.MustParse(buildMemory).Value()/2)),
+		},
 	}
 
 	volumeMounts := []corev1.VolumeMount{{Name: "workspace", MountPath: "/workspace"}}
@@ -816,12 +854,6 @@ func (r *GitshipAppReconciler) ensureBuildJob(ctx context.Context, gitshipApp *g
 			fi
 		`, sshUrl)
 	}
-
-	buildRes := gitshipApp.Spec.BuildResources
-	if buildRes.CPU == "" && buildRes.Memory == "" {
-		buildRes = gitshipApp.Spec.Resources
-	}
-	buildResources := resolveResources(buildRes)
 
 	newJob := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{

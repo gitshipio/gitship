@@ -42,6 +42,7 @@ import (
 	gitshipiov1alpha1 "github.com/gitshipio/gitship/api/gitship.io/v1alpha1"
 	gitshipiocontroller "github.com/gitshipio/gitship/internal/controller/gitship.io"
 	gitshipwebhook "github.com/gitshipio/gitship/internal/webhook"
+	cmv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -53,6 +54,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
+	utilruntime.Must(cmv1.AddToScheme(scheme))
 	utilruntime.Must(gitshipiov1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
