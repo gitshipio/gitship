@@ -787,14 +787,17 @@ func (r *GitshipAppReconciler) ensureBuildJob(ctx context.Context, gitshipApp *g
 		}
 	}
 
+	buildCPUQuantity := resource.MustParse(buildCPU)
+	buildMemoryQuantity := resource.MustParse(buildMemory)
+
 	buildResources := corev1.ResourceRequirements{
 		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse(buildCPU),
-			corev1.ResourceMemory: resource.MustParse(buildMemory),
+			corev1.ResourceCPU:    buildCPUQuantity,
+			corev1.ResourceMemory: buildMemoryQuantity,
 		},
 		Requests: corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse(fmt.Sprintf("%dm", resource.MustParse(buildCPU).MilliValue()/2)),
-			corev1.ResourceMemory: resource.MustParse(fmt.Sprintf("%d", resource.MustParse(buildMemory).Value()/2)),
+			corev1.ResourceCPU:    resource.MustParse(fmt.Sprintf("%dm", buildCPUQuantity.MilliValue()/2)),
+			corev1.ResourceMemory: resource.MustParse(fmt.Sprintf("%d", buildMemoryQuantity.Value()/2)),
 		},
 	}
 
