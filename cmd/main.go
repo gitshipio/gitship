@@ -39,10 +39,10 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	cmv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	gitshipiov1alpha1 "github.com/gitshipio/gitship/api/gitship.io/v1alpha1"
 	gitshipiocontroller "github.com/gitshipio/gitship/internal/controller/gitship.io"
 	gitshipwebhook "github.com/gitshipio/gitship/internal/webhook"
-	cmv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	// +kubebuilder:scaffold:imports
 )
 

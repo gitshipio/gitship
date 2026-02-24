@@ -21,7 +21,7 @@ export async function POST(
         }
     }
 
-    await k8sCustomApi.patchClusterCustomObject({
+    await k8sCustomApi.patchNamespacedCustomObject({
         group: "gitship.io",
         version: "v1alpha1",
         namespace,
