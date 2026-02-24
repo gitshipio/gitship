@@ -34,6 +34,8 @@ interface AppConfigurationProps {
         tls?: { enabled: boolean; issuer?: string }
         secretRefs?: string[]
         secretMounts?: { secretName: string; mountPath: string }[]
+        ingresses?: IngressRuleConfig[]
+        rebuildToken?: string
     }
 }
 
