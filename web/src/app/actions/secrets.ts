@@ -72,6 +72,7 @@ export async function setupAppSSH(namespace: string, appName: string, repoUrl: s
             name: appName,
             body: patch
         }, {
+            // @ts-expect-error - headers is missing in ConfigurationOptions but supported at runtime
             headers: { "Content-Type": "application/merge-patch+json" }
         })
 

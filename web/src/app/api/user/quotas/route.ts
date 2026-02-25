@@ -39,10 +39,10 @@ export async function PATCH(req: NextRequest) {
             plural: "gitshipusers",
             name: internalId,
             body: patch
-        }, {
-            headers: { "Content-Type": "application/merge-patch+json" }
-        })
-
+                    }, {
+                        // @ts-expect-error - headers is missing in ConfigurationOptions but supported at runtime
+                        headers: { "Content-Type": "application/merge-patch+json" }
+                    })
         return NextResponse.json({ ok: true })
     } catch (e: any) {
         console.error("[API] Failed to update user quotas:", e.body?.message || e.message)

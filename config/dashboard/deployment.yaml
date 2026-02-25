@@ -14,9 +14,20 @@ spec:
       labels:
         app: dashboard
     spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       serviceAccountName: dashboard
       containers:
         - name: dashboard
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - "ALL"
+            runAsUser: 1000
+            runAsGroup: 1000
           image: gitship-dashboard:latest
           imagePullPolicy: IfNotPresent
           ports:

@@ -75,26 +75,25 @@ var _ = Describe("Manager", Ordered, func() {
 		Expect(err).NotTo(HaveOccurred(), "Failed to deploy the controller-manager")
 	})
 
-	// After all tests have been executed, clean up by undeploying the controller, uninstalling CRDs,
-	// and deleting the namespace.
-	AfterAll(func() {
-		By("cleaning up the curl pod for metrics")
-		cmd := exec.Command("kubectl", "delete", "pod", "curl-metrics", "-n", namespace)
-		_, _ = utils.Run(cmd)
-
-		By("undeploying the controller-manager")
-		cmd = exec.Command("make", "undeploy")
-		_, _ = utils.Run(cmd)
-
-		By("uninstalling CRDs")
-		cmd = exec.Command("make", "uninstall")
-		_, _ = utils.Run(cmd)
-
-		By("removing manager namespace")
-		cmd = exec.Command("kubectl", "delete", "ns", namespace)
-		_, _ = utils.Run(cmd)
-	})
-
+		// After all tests have been executed, clean up by undeploying the controller, uninstalling CRDs,
+		// and deleting the namespace.
+		AfterAll(func() {
+			By("cleaning up the curl pod for metrics")
+			cmd := exec.Command("kubectl", "delete", "pod", "curl-metrics", "-n", namespace)
+			_, _ = utils.Run(cmd)
+	
+			By("undeploying the controller-manager")
+			cmd = exec.Command("make", "undeploy")
+			_, _ = utils.Run(cmd)
+	
+			By("uninstalling CRDs")
+			cmd = exec.Command("make", "uninstall")
+			_, _ = utils.Run(cmd)
+	
+			By("removing manager namespace")
+			cmd = exec.Command("kubectl", "delete", "ns", namespace)
+			_, _ = utils.Run(cmd)
+		})
 	// After each test, check for failures and collect logs, events,
 	// and pod descriptions for debugging.
 	AfterEach(func() {

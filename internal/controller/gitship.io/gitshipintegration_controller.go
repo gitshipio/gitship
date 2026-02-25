@@ -49,6 +49,7 @@ type GitshipIntegrationReconciler struct {
 
 const (
 	phaseDisabled = "Disabled"
+	phaseReady    = "Ready"
 )
 
 func (r *GitshipIntegrationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -81,8 +82,8 @@ func (r *GitshipIntegrationReconciler) Reconcile(ctx context.Context, req ctrl.R
 func (r *GitshipIntegrationReconciler) reconcileCertManager(ctx context.Context, integration *gitshipiov1alpha1.GitshipIntegration) (ctrl.Result, error) {
 	// Logic for Issuer creation is handled by GitshipUser controller.
 	// Here we just update the status to show it's active.
-	if integration.Status.Phase != "Ready" {
-		integration.Status.Phase = "Ready"
+	if integration.Status.Phase != phaseReady {
+		integration.Status.Phase = phaseReady
 		integration.Status.Message = "Cert-Manager integration active"
 		integration.Status.ReadyReplicas = 1
 		integration.Status.DesiredReplicas = 1
@@ -244,7 +245,7 @@ func (r *GitshipIntegrationReconciler) reconcileCloudflareTunnel(ctx context.Con
 	}
 
 	// 3. Update Status
-	targetPhase := "Ready"
+	targetPhase := phaseReady
 	targetMessage := "Cloudflare Tunnel is running"
 
 	if dep.Status.ReadyReplicas == 0 && *dep.Spec.Replicas > 0 {

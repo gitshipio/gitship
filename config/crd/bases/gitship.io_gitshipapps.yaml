@@ -43,6 +43,21 @@ spec:
                 default: token
                 description: 'Authentication method: "ssh" or "token"'
                 type: string
+              buildResources:
+                properties:
+                  cpu:
+                    default: 500m
+                    description: CPU limit (e.g. "500m", "1")
+                    type: string
+                  memory:
+                    default: 1Gi
+                    description: Memory limit (e.g. "512Mi", "1Gi")
+                    type: string
+                  storage:
+                    default: 1Gi
+                    description: Storage limit (e.g. "1Gi", "10Gi")
+                    type: string
+                type: object
               env:
                 additionalProperties:
                   type: string
@@ -116,6 +131,10 @@ spec:
                   - targetPort
                   type: object
                 type: array
+              rebuildToken:
+                description: Token to trigger a manual rebuild. Changing this value
+                  forces a new build.
+                type: string
               registrySecretRef:
                 description: Build Configuration
                 type: string
@@ -255,6 +274,9 @@ spec:
               lastDeployedAt:
                 type: string
               latestBuildId:
+                type: string
+              latestRebuildToken:
+                description: Tracks the last processed rebuild token
                 type: string
               phase:
                 type: string

@@ -87,10 +87,10 @@ export async function bindSecretToApp(namespace: string, appName: string, secret
                         secretRefs: refs
                     }
                 }
-            }, {
-                headers: { "Content-Type": "application/merge-patch+json" }
-            })
-        }
+                            }, {
+                                // @ts-expect-error - headers is missing in ConfigurationOptions but supported at runtime
+                                headers: { "Content-Type": "application/merge-patch+json" }
+                            })        }
   } catch (e: unknown) {
     // @ts-expect-error dynamic access
     throw new Error(e.body?.message || e.message)
@@ -122,10 +122,10 @@ export async function unbindSecretFromApp(namespace: string, appName: string, se
                     secretRefs: newRefs
                 }
             }
-        }, {
-            headers: { "Content-Type": "application/merge-patch+json" }
-        })
-            
+                        }, {
+                            // @ts-expect-error - headers is missing in ConfigurationOptions but supported at runtime
+                            headers: { "Content-Type": "application/merge-patch+json" }
+                        })            
   } catch (e: unknown) {
     // @ts-expect-error dynamic access
     throw new Error(e.body?.message || e.message)

@@ -50,6 +50,13 @@ spec:
               quotas:
                 description: Resource Quotas for this user's namespaces
                 properties:
+                  buildCPU:
+                    default: "1"
+                    description: Account-wide build resources
+                    type: string
+                  buildMemory:
+                    default: 2Gi
+                    type: string
                   cpu:
                     description: Maximum CPU cores (e.g. "4")
                     type: string

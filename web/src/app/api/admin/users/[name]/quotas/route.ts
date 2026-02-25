@@ -32,6 +32,7 @@ export async function PATCH(
       name: name,
       body: patch
     }, {
+      // @ts-expect-error - headers is missing in ConfigurationOptions but supported at runtime
       headers: { "Content-Type": "application/merge-patch+json" }
     })
 

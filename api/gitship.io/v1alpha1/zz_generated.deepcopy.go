@@ -116,6 +116,7 @@ func (in *GitshipAppSpec) DeepCopyInto(out *GitshipAppSpec) {
 		}
 	}
 	out.Resources = in.Resources
+	out.BuildResources = in.BuildResources
 	if in.Ingresses != nil {
 		in, out := &in.Ingresses, &out.Ingresses
 		*out = make([]IngressRuleConfig, len(*in))

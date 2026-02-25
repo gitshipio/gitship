@@ -35,8 +35,8 @@ RUN apt-get update && apt-get install -y openssl ca-certificates && rm -rf /var/
 COPY --from=builder /workspace/manager .
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
-RUN mkdir -p /tmp/k8s-webhook-server/serving-certs
+RUN mkdir -p /tmp/k8s-webhook-server/serving-certs && chown 65532:65532 /tmp/k8s-webhook-server/serving-certs
 
-# USER 65532:65532
+USER 65532:65532
 
 ENTRYPOINT ["/entrypoint.sh"]
