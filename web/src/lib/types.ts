@@ -50,6 +50,10 @@ export interface GitshipAppSpec {
     memory?: string;
     storage?: string;
   };
+  buildResources?: {
+    cpu?: string;
+    memory?: string;
+  };
   healthCheck?: {
     path?: string;
     port?: number;
