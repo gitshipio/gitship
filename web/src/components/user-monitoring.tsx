@@ -41,13 +41,13 @@ interface MetricsData {
 }
 
 function formatMemory(val: number | string) {
-    const bytes = typeof val === 'string' ? parseResourceValue(val) : val
+    const bytes = typeof val === 'string' ? parseResourceValue(val, 'mem') : val
     if (bytes >= 1024 * 1024 * 1024) return (bytes / (1024 * 1024 * 1024)).toFixed(1) + "Gi"
     return (bytes / (1024 * 1024)).toFixed(0) + "Mi"
 }
 
 function formatCpu(millicores: string | number) {
-    const m = typeof millicores === 'string' ? parseResourceValue(millicores) : millicores
+    const m = typeof millicores === 'string' ? parseResourceValue(millicores, 'cpu') : millicores
     return (m / 1000).toFixed(2) + " Cores"
 }
 
@@ -85,8 +85,8 @@ export function UserMonitoring() {
     }
 
     const total = data?.total
-    const cpuUsageNum = typeof total?.cpuUsage === 'number' ? total.cpuUsage : parseResourceValue(total?.cpuUsage || "0")
-    const cpuLimitNum = typeof total?.cpuLimit === 'number' ? total.cpuLimit : parseResourceValue(total?.cpuLimit || "0")
+    const cpuUsageNum = typeof total?.cpuUsage === 'number' ? total.cpuUsage : parseResourceValue(total?.cpuUsage || "0", 'cpu')
+    const cpuLimitNum = typeof total?.cpuLimit === 'number' ? total.cpuLimit : parseResourceValue(total?.cpuLimit || "0", 'cpu')
     const cpuPercent = cpuLimitNum > 0 ? (cpuUsageNum / cpuLimitNum) * 100 : 0
 
     const memUsageNum = total?.memoryUsage || 0
@@ -334,9 +334,9 @@ function AppResourceRow({ app, onUpdate }: { app: AppMetrics, onUpdate: () => vo
         }
     }
 
-    const cpuUsagePct = parseResourceValue(app.cpuLimit) > 0 ? (app.cpuUsage / parseResourceValue(app.cpuLimit)) * 100 : 0
-    const memUsagePct = parseResourceValue(app.memoryLimit) > 0 ? (app.memoryUsage / parseResourceValue(app.memoryLimit)) * 100 : 0
-    const storageUsagePct = parseResourceValue(app.storageLimit) > 0 ? (app.storageUsage / parseResourceValue(app.storageLimit)) * 100 : 0
+    const cpuUsagePct = parseResourceValue(app.cpuLimit, 'cpu') > 0 ? (app.cpuUsage / parseResourceValue(app.cpuLimit, 'cpu')) * 100 : 0
+    const memUsagePct = parseResourceValue(app.memoryLimit, 'mem') > 0 ? (app.memoryUsage / parseResourceValue(app.memoryLimit, 'mem')) * 100 : 0
+    const storageUsagePct = parseResourceValue(app.storageLimit, 'mem') > 0 ? (app.storageUsage / parseResourceValue(app.storageLimit, 'mem')) * 100 : 0
 
     return (
         <Card className="overflow-hidden border-border/40 hover:border-primary/30 transition-colors shadow-sm">

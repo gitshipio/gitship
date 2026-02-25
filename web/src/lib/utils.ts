@@ -5,7 +5,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function parseResourceValue(val: string | number): number {
+export function parseResourceValue(val: string | number, type: 'cpu' | 'mem' | 'raw' = 'mem'): number {
     if (val === undefined || val === null) return 0
     if (typeof val === 'number') return val
     const s = val.toString().toLowerCase()
@@ -13,7 +13,11 @@ export function parseResourceValue(val: string | number): number {
     if (s.endsWith("gi")) return parseFloat(s) * 1024 * 1024 * 1024
     if (s.endsWith("mi")) return parseFloat(s) * 1024 * 1024
     if (s.endsWith("ki")) return parseFloat(s) * 1024
-    return parseFloat(s) * 1000
+    
+    // CPU fallback: cores to millicores
+    if (type === 'cpu') return parseFloat(s) * 1000
+    // Raw fallback: just the number
+    return parseFloat(s)
 }
 
 export function stripUnits(val: string | number | undefined, unit: 'cpu' | 'mem'): string {

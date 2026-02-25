@@ -11,11 +11,11 @@ interface QuotaData {
     used: Record<string, string>
 }
 
-function UsageDetail({ label, used, hard, unit, icon: Icon, color, isCpu }: { 
-    label: string, used: string | number, hard: string | number, unit?: string, icon: React.ComponentType<{ className?: string }>, color: string, isCpu?: boolean 
+function UsageDetail({ label, used, hard, unit, icon: Icon, color, isCpu, type = 'mem' }: { 
+    label: string, used: string | number, hard: string | number, unit?: string, icon: React.ComponentType<{ className?: string }>, color: string, isCpu?: boolean, type?: 'cpu' | 'mem' | 'raw'
 }) {
-    const usedNum = parseResourceValue(used)
-    const hardNum = parseResourceValue(hard)
+    const usedNum = parseResourceValue(used, type)
+    const hardNum = parseResourceValue(hard, type)
     
     const percent = hardNum > 0 ? Math.min((usedNum / hardNum) * 100, 100) : 0
     const remaining = Math.max(0, hardNum - usedNum)
@@ -26,7 +26,7 @@ function UsageDetail({ label, used, hard, unit, icon: Icon, color, isCpu }: {
         }
         if (v >= 1024 * 1024 * 1024) return (v / (1024 * 1024 * 1024)).toFixed(1) + "Gi"
         if (v >= 1024 * 1024) return (v / (1024 * 1024)).toFixed(0) + "Mi"
-        if (label === "Active Pods") return v.toFixed(0)
+        if (label === "Active Pods" || type === 'raw') return v.toFixed(0)
         return v.toFixed(0) + (unit || "")
     }
 
@@ -39,12 +39,12 @@ function UsageDetail({ label, used, hard, unit, icon: Icon, color, isCpu }: {
                     </div>
                     <div>
                         <p className="text-[10px] font-black uppercase tracking-tighter opacity-40 leading-none mb-1">{label}</p>
-                        <p className="text-sm font-bold leading-none truncate max-w-[80px]" title={String(used)}>{format(usedNum)} used</p>
+                        <p className="text-sm font-bold leading-none truncate max-w-[120px]" title={String(used)}>{format(usedNum)} used</p>
                     </div>
                 </div>
                 <div className="text-right">
                     <p className="text-[10px] font-black uppercase tracking-tighter opacity-40 leading-none mb-1">Limit</p>
-                    <p className="text-sm font-bold leading-none truncate max-w-[60px]" title={String(hard)}>{format(hardNum)}</p>
+                    <p className="text-sm font-bold leading-none truncate max-w-[100px]" title={String(hard)}>{format(hardNum)}</p>
                 </div>
             </div>
             
@@ -122,6 +122,7 @@ export function ResourceUsage({ data: initialData, username }: { data?: QuotaDat
                     icon={Cpu} 
                     color="text-blue-500" 
                     isCpu={true}
+                    type="cpu"
                 />
                 <UsageDetail 
                     label="RAM Memory" 
@@ -130,6 +131,7 @@ export function ResourceUsage({ data: initialData, username }: { data?: QuotaDat
                     unit="" 
                     icon={MemoryStick} 
                     color="text-purple-500" 
+                    type="mem"
                 />
                 <UsageDetail 
                     label="Active Pods" 
@@ -138,6 +140,7 @@ export function ResourceUsage({ data: initialData, username }: { data?: QuotaDat
                     unit="" 
                     icon={Box} 
                     color="text-emerald-500" 
+                    type="raw"
                 />
                 <UsageDetail 
                     label="Disk Storage" 
@@ -146,6 +149,7 @@ export function ResourceUsage({ data: initialData, username }: { data?: QuotaDat
                     unit="" 
                     icon={Database} 
                     color="text-amber-500" 
+                    type="mem"
                 />
             </CardContent>
         </Card>
