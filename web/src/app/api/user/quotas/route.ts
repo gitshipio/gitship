@@ -38,10 +38,7 @@ export async function PATCH(req: NextRequest) {
             version: "v1alpha1",
             plural: "gitshipusers",
             name: internalId,
-            body: patch,
-            options: {
-                headers: { "Content-Type": "application/merge-patch+json" }
-            }
+            body: patch
         })
 
         return NextResponse.json({ ok: true })

@@ -67,27 +67,11 @@ export async function PATCH(req: NextRequest) {
 
         console.log(`[API] PATCH GitshipIntegration ${name} in ${namespace}:`, JSON.stringify(patchData))
 
-        // Create a JSON Patch array
-        const patch = []
-        
-        if (patchData.spec) {
-            if (patchData.spec.resources) {
-                patch.push({
-                    op: "replace",
-                    path: "/spec/resources",
-                    value: patchData.spec.resources,
-                })
-            }
-            if (patchData.spec.replicas !== undefined) {
-                patch.push({
-                    op: "replace",
-                    path: "/spec/replicas",
-                    value: patchData.spec.replicas,
-                })
-            }
-        }
+        if (Object.keys(patchData.spec || {}).length === 0) return NextResponse.json({ ok: true })
 
-        if (patch.length === 0) return NextResponse.json({ ok: true })
+        const patch = {
+            spec: patchData.spec
+        }
 
         await k8sCustomApi.patchNamespacedCustomObject({
             group: "gitship.io",
@@ -95,10 +79,7 @@ export async function PATCH(req: NextRequest) {
             namespace,
             plural: "gitshipintegrations",
             name,
-            body: patch,
-            options: {
-                headers: { "Content-Type": "application/json-patch+json" }
-            }
+            body: patch
         })
 
         console.log(`[API] SUCCESS: Patched GitshipIntegration ${name} in ${namespace}`)

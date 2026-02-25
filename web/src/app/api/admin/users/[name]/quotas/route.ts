@@ -19,23 +19,18 @@ export async function PATCH(
   try {
     const { quotas } = await req.json()
     
-    const patch = [
-      {
-        op: "add", // Use add to either create or replace the quotas object
-        path: "/spec/quotas",
-        value: quotas,
-      },
-    ]
+    const patch = {
+      spec: {
+        quotas: quotas
+      }
+    }
 
     await k8sCustomApi.patchClusterCustomObject({
       group: "gitship.io",
       version: "v1alpha1",
       plural: "gitshipusers",
       name: name,
-      body: patch,
-      options: {
-        headers: { "Content-Type": "application/json-patch+json" }
-      }
+      body: patch
     })
 
     return NextResponse.json({ ok: true })

@@ -22,24 +22,19 @@ export async function PATCH(
         return NextResponse.json({ error: "Invalid role" }, { status: 400 })
     }
 
-    // JSON Patch (Array)
-    const patch = [
-      {
-        op: "replace",
-        path: "/spec/role",
-        value: role,
-      },
-    ]
+    // JSON Merge Patch (Object)
+    const patch = {
+      spec: {
+        role: role,
+      }
+    }
 
     await k8sCustomApi.patchClusterCustomObject({
       group: "gitship.io",
       version: "v1alpha1",
       plural: "gitshipusers",
       name: name,
-      body: patch,
-      options: {
-        headers: { "Content-Type": "application/json-patch+json" }
-      }
+      body: patch
     })
 
     return NextResponse.json({ ok: true })

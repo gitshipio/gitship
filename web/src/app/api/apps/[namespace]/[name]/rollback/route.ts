@@ -20,16 +20,14 @@ export async function POST(
   if (!commitId) return NextResponse.json({ error: "commitId is required" }, { status: 400 })
 
   try {
-    const patch = [
-      {
-        op: "replace",
-        path: "/spec/source",
-        value: {
+    const patch = {
+      spec: {
+        source: {
           type: "commit",
           value: commitId
-        },
-      },
-    ]
+        }
+      }
+    }
 
     await k8sCustomApi.patchNamespacedCustomObject({
       group: "gitship.io",
@@ -38,9 +36,6 @@ export async function POST(
       plural: "gitshipapps",
       name,
       body: patch
-    }, {
-      // @ts-expect-error custom headers for JSON Patch
-      headers: { "Content-Type": "application/json-patch+json" }
     })
 
     return NextResponse.json({ ok: true })

@@ -82,10 +82,11 @@ export async function bindSecretToApp(namespace: string, appName: string, secret
                 namespace,
                 plural: "gitshipapps",
                 name: appName,
-                body: [{ op: "replace", path: "/spec/secretRefs", value: refs }]
-            }, {
-                // @ts-expect-error custom headers
-                headers: { "Content-Type": "application/json-patch+json" }
+                body: {
+                    spec: {
+                        secretRefs: refs
+                    }
+                }
             })
         }
   } catch (e: unknown) {
@@ -114,11 +115,12 @@ export async function unbindSecretFromApp(namespace: string, appName: string, se
             namespace,
             plural: "gitshipapps",
             name: appName,
-                            body: [{ op: "replace", path: "/spec/secretRefs", value: newRefs }]
-                        }, {
-                            // @ts-expect-error custom headers
-                            headers: { "Content-Type": "application/json-patch+json" }
-                        })
+            body: {
+                spec: {
+                    secretRefs: newRefs
+                }
+            }
+        })
             
   } catch (e: unknown) {
     // @ts-expect-error dynamic access

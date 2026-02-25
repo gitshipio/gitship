@@ -27,10 +27,7 @@ export async function POST(
         namespace,
         plural: "gitshipapps",
         name,
-        body: patch,
-        options: {
-            headers: { "Content-Type": "application/merge-patch+json" }
-        }
+        body: patch
     })
 
     return NextResponse.json({ ok: true })

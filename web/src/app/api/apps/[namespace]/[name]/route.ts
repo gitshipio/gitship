@@ -19,19 +19,11 @@ export async function PATCH(
     const patchData = await req.json()
     console.log(`[API] PATCH GitshipApp ${name} in ${namespace}:`, JSON.stringify(patchData))
 
-    // Build JSON Patch operations for every spec field sent by the frontend.
-    // Uses "add" op which creates the path if missing, or replaces if it exists.
-    const patch: { op: string; path: string; value: unknown }[] = []
+    if (!patchData.spec) return NextResponse.json({ ok: true })
 
-    if (patchData.spec) {
-      for (const [key, value] of Object.entries(patchData.spec)) {
-        if (value !== undefined) {
-          patch.push({ op: "add", path: `/spec/${key}`, value })
-        }
-      }
+    const patch = {
+      spec: patchData.spec
     }
-
-    if (patch.length === 0) return NextResponse.json({ ok: true })
 
     await k8sCustomApi.patchNamespacedCustomObject({
       group: "gitship.io",
@@ -39,10 +31,7 @@ export async function PATCH(
       namespace,
       plural: "gitshipapps",
       name,
-      body: patch,
-      options: {
-        headers: { "Content-Type": "application/json-patch+json" }
-      }
+      body: patch
     })
 
     console.log(`[API] SUCCESS: Patched GitshipApp ${name} in ${namespace}`)

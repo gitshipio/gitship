@@ -36,7 +36,7 @@ export async function GET() {
   
   try {
     const metricsClient = new k8s.Metrics(kc)
-    const [quotaResponse, gitshipAppsResponse, gitshipIntegrationsResponse, pvcResponse] = await Promise.all([
+    const [quotaResponse, gitshipAppsResponse, gitshipIntegrationsResponse, pvcResponse, userResponse] = await Promise.all([
         k8sCoreApi.readNamespacedResourceQuota({ name: "user-quota", namespace }).catch(() => null),
         k8sCustomApi.listNamespacedCustomObject({
             group: "gitship.io",
@@ -50,7 +50,13 @@ export async function GET() {
             namespace,
             plural: "gitshipintegrations",
         }).catch(() => ({ body: { items: [] } })),
-        k8sCoreApi.listNamespacedPersistentVolumeClaim({ namespace }).catch(() => ({ body: { items: [] } }))
+        k8sCoreApi.listNamespacedPersistentVolumeClaim({ namespace }).catch(() => ({ body: { items: [] } })),
+        k8sCustomApi.getClusterCustomObject({
+            group: "gitship.io",
+            version: "v1alpha1",
+            plural: "gitshipusers",
+            name: internalId
+        }).catch(() => null)
     ])
     
     const gitshipApps = gitshipAppsResponse?.body || gitshipAppsResponse
@@ -61,6 +67,7 @@ export async function GET() {
     const quota = quotaResponse?.body || quotaResponse
     // @ts-expect-error dynamic access
     const pvcs = pvcResponse?.body?.items || pvcResponse?.items || []
+    const user = (userResponse?.body || userResponse) as any
 
     // 1. Map Apps for easy lookup
     const appsMap: Record<string, {
@@ -75,9 +82,7 @@ export async function GET() {
         memoryUsage: number,
         storageUsage: number,
         podCount: number,
-        replicas: number,
-        buildCpuLimit?: string,
-        buildMemoryLimit?: string
+        replicas: number
     }> = {}
 
     appsItems.forEach((app: GitshipApp) => {
@@ -88,8 +93,6 @@ export async function GET() {
             cpuLimit: app.spec.resources?.cpu || "500m",
             memoryLimit: app.spec.resources?.memory || "1Gi",
             storageLimit: app.spec.resources?.storage || "1Gi",
-            buildCpuLimit: app.spec.buildResources?.cpu || "",
-            buildMemoryLimit: app.spec.buildResources?.memory || "",
             cpuUsage: 0,
             memoryUsage: 0,
             storageUsage: 0,
@@ -187,7 +190,9 @@ export async function GET() {
             podCount: totalPods,
             podLimit: parseInt(hard["pods"] || "0"),
             storageUsage: parseMemory(sUsage),
-            storageLimit: parseMemory(sLimit)
+            storageLimit: parseMemory(sLimit),
+            buildCPU: user?.spec?.quotas?.buildCPU || "1",
+            buildMemory: user?.spec?.quotas?.buildMemory || "2Gi"
         },
         apps: Object.values(appsMap)
     })

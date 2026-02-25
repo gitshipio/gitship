@@ -20,8 +20,6 @@ interface AppMetrics {
     memoryLimit: string
     storageUsage: number
     storageLimit: string
-    buildCpuLimit?: string
-    buildMemoryLimit?: string
     podCount: number
     replicas: number
 }
@@ -36,6 +34,8 @@ interface MetricsData {
         podLimit: number
         storageUsage: number
         storageLimit: number
+        buildCPU?: string
+        buildMemory?: string
     }
     apps: AppMetrics[]
 }
@@ -54,6 +54,10 @@ function formatCpu(millicores: string | number) {
 export function UserMonitoring() {
     const [data, setData] = useState<MetricsData | null>(null)
     const [loading, setLoading] = useState(true)
+    const [editingGlobal, setEditingGlobal] = useState(false)
+    const [savingGlobal, setSavingGlobal] = useState(false)
+    const [globalBuildCPU, setGlobalBuildCPU] = useState("")
+    const [globalBuildMemory, setGlobalBuildMemory] = useState("")
 
     const fetchData = async () => {
         try {
@@ -61,6 +65,10 @@ export function UserMonitoring() {
             if (res.ok) {
                 const json = await res.json()
                 setData(json)
+                if (!editingGlobal) {
+                    setGlobalBuildCPU(json.total.buildCPU || "1")
+                    setGlobalBuildMemory(json.total.buildMemory || "2Gi")
+                }
             }
         } catch (e) {
             console.error("Failed to fetch metrics:", e)
@@ -69,11 +77,37 @@ export function UserMonitoring() {
         }
     }
 
+    const handleSaveGlobalQuotas = async () => {
+        setSavingGlobal(true)
+        try {
+            const res = await fetch("/api/user/quotas", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    spec: {
+                        quotas: {
+                            buildCPU: globalBuildCPU,
+                            buildMemory: globalBuildMemory
+                        }
+                    }
+                })
+            })
+            if (res.ok) {
+                setEditingGlobal(false)
+                fetchData()
+            }
+        } catch (e) {
+            console.error("Failed to save global quotas:", e)
+        } finally {
+            setSavingGlobal(false)
+        }
+    }
+
     useEffect(() => {
         fetchData()
         const interval = setInterval(fetchData, 10000)
         return () => clearInterval(interval)
-    }, [])
+    }, [editingGlobal])
 
     if (loading && !data) {
         return (
@@ -197,6 +231,60 @@ export function UserMonitoring() {
                 </Card>
             </div>
 
+            {/* GLOBAL BUILD RESOURCES */}
+            <Card className="border-primary/20 bg-primary/[0.02] shadow-md">
+                <CardContent className="p-4 flex flex-col md:flex-row items-center justify-between gap-6">
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 rounded-2xl bg-primary/10 text-primary">
+                            <Zap className="w-6 h-6 fill-primary/20" />
+                        </div>
+                        <div>
+                            <h3 className="text-sm font-black uppercase tracking-widest opacity-70">Global Build Resources</h3>
+                            <p className="text-[10px] text-muted-foreground">Limits applied to every build job in your account.</p>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-6">
+                        {editingGlobal ? (
+                            <div className="flex items-center gap-3 animate-in zoom-in-95">
+                                <div className="space-y-1">
+                                    <span className="text-[8px] font-black uppercase ml-1 opacity-50">Build CPU</span>
+                                    <Input value={globalBuildCPU} onChange={e => setGlobalBuildCPU(e.target.value)} className="h-9 w-20 font-mono text-xs" />
+                                </div>
+                                <div className="space-y-1">
+                                    <span className="text-[8px] font-black uppercase ml-1 opacity-50">Build RAM</span>
+                                    <Input value={globalBuildMemory} onChange={e => setGlobalBuildMemory(e.target.value)} className="h-9 w-24 font-mono text-xs" />
+                                </div>
+                                <div className="flex gap-1 pt-4">
+                                    <Button size="sm" className="h-9 px-4 gap-2" onClick={handleSaveGlobalQuotas} disabled={savingGlobal}>
+                                        {savingGlobal ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                                        Save
+                                    </Button>
+                                    <Button size="sm" variant="ghost" className="h-9" onClick={() => setEditingGlobal(false)} disabled={savingGlobal}>
+                                        <X className="w-4 h-4" />
+                                    </Button>
+                                </div>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="text-center">
+                                    <p className="text-[9px] font-black uppercase opacity-40 mb-0.5">CPU Limit</p>
+                                    <p className="font-mono text-sm font-bold">{globalBuildCPU}</p>
+                                </div>
+                                <div className="text-center">
+                                    <p className="text-[9px] font-black uppercase opacity-40 mb-0.5">RAM Limit</p>
+                                    <p className="font-mono text-sm font-bold">{globalBuildMemory}</p>
+                                </div>
+                                <Button variant="outline" size="sm" onClick={() => setEditingGlobal(true)} className="gap-2 h-9 px-4">
+                                    <Settings2 className="w-3.5 h-3.5" />
+                                    Adjust Pipeline
+                                </Button>
+                            </>
+                        )}
+                    </div>
+                </CardContent>
+            </Card>
+
             {/* APPS SECTION */}
             <div className="space-y-6">
                 <div className="flex items-center justify-between">
@@ -250,8 +338,6 @@ function AppResourceRow({ app, onUpdate }: { app: AppMetrics, onUpdate: () => vo
     const [cpu, setCpu] = useState(stripUnits(app.cpuLimit, 'cpu'))
     const [mem, setMem] = useState(stripUnits(app.memoryLimit, 'mem'))
     const [storage, setStorage] = useState(stripUnits(app.storageLimit, 'mem'))
-    const [buildCpu, setBuildCpu] = useState(stripUnits(app.buildCpuLimit || "", 'cpu'))
-    const [buildMemory, setBuildMemory] = useState(stripUnits(app.buildMemoryLimit || "", 'mem'))
     const [replicas, setReplicas] = useState(app.replicas)
 
     // Sync state when app prop changes, but ONLY when not editing
@@ -260,8 +346,6 @@ function AppResourceRow({ app, onUpdate }: { app: AppMetrics, onUpdate: () => vo
             setCpu(stripUnits(app.cpuLimit, 'cpu'))
             setMem(stripUnits(app.memoryLimit, 'mem'))
             setStorage(stripUnits(app.storageLimit, 'mem'))
-            setBuildCpu(stripUnits(app.buildCpuLimit || "", 'cpu'))
-            setBuildMemory(stripUnits(app.buildMemoryLimit || "", 'mem'))
             setReplicas(app.replicas)
         }
     }, [app, editing])
@@ -272,8 +356,6 @@ function AppResourceRow({ app, onUpdate }: { app: AppMetrics, onUpdate: () => vo
             const cpuVal = cpu.trim() + "m"
             const memVal = mem.trim() + "Mi"
             const storageVal = storage.trim() + "Mi"
-            const buildCpuVal = buildCpu ? buildCpu.trim() + "m" : undefined
-            const buildMemVal = buildMemory ? buildMemory.trim() + "Mi" : undefined
 
             let res;
             if (app.type === "app") {
@@ -286,10 +368,6 @@ function AppResourceRow({ app, onUpdate }: { app: AppMetrics, onUpdate: () => vo
                                 cpu: cpuVal,
                                 memory: memVal,
                                 storage: storageVal
-                            },
-                            buildResources: {
-                                cpu: buildCpuVal,
-                                memory: buildMemVal
                             },
                             replicas
                         }
@@ -410,20 +488,10 @@ function AppResourceRow({ app, onUpdate }: { app: AppMetrics, onUpdate: () => vo
                                 <Input type="number" value={replicas} onChange={e => setReplicas(parseInt(e.target.value) || 0)} className="h-8 w-12 font-mono text-[10px]" />
                             </div>
                             {app.type === "app" && (
-                                <>
-                                    <div className="space-y-1">
-                                        <span className="text-[8px] font-black uppercase ml-1 opacity-50">MiB Disk</span>
-                                        <Input value={storage} onChange={e => setStorage(e.target.value)} className="h-8 w-16 font-mono text-[10px]" />
-                                    </div>
-                                    <div className="space-y-1 border-l pl-3 ml-2">
-                                        <span className="text-[8px] font-black uppercase ml-1 opacity-50 text-emerald-500">Build mCore</span>
-                                        <Input value={buildCpu} onChange={e => setBuildCpu(e.target.value)} className="h-8 w-16 font-mono text-[10px]" />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <span className="text-[8px] font-black uppercase ml-1 opacity-50 text-emerald-500">Build MiB</span>
-                                        <Input value={buildMemory} onChange={e => setBuildMemory(e.target.value)} className="h-8 w-16 font-mono text-[10px]" />
-                                    </div>
-                                </>
+                                <div className="space-y-1">
+                                    <span className="text-[8px] font-black uppercase ml-1 opacity-50">MiB Disk</span>
+                                    <Input value={storage} onChange={e => setStorage(e.target.value)} className="h-8 w-16 font-mono text-[10px]" />
+                                </div>
                             )}
                             <div className="flex gap-1 pl-2">
                                 <Button size="icon" variant="ghost" className="h-8 w-8 text-emerald-500" onClick={handleSave} disabled={saving}>

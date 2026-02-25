@@ -59,9 +59,11 @@ export async function setupAppSSH(namespace: string, appName: string, repoUrl: s
         await createSecret(namespace, appName, "ssh-key", { "ssh-privatekey": privateKey })
 
         // Update GitshipApp spec
-        const patch = [
-            { op: "replace", path: "/spec/authMethod", value: "ssh" }
-        ]
+        const patch = {
+            spec: {
+                authMethod: "ssh"
+            }
+        }
         await k8sCustomApi.patchNamespacedCustomObject({
             group: "gitship.io",
             version: "v1alpha1",
@@ -69,9 +71,6 @@ export async function setupAppSSH(namespace: string, appName: string, repoUrl: s
             plural: "gitshipapps",
             name: appName,
             body: patch
-        }, {
-            // @ts-expect-error custom headers for JSON Patch
-            headers: { "Content-Type": "application/json-patch+json" }
         })
 
         revalidatePath(`/app/${namespace}/${appName}`)
