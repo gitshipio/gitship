@@ -5,7 +5,7 @@ import { createSecret, deleteSecret, bindSecretToApp, unbindSecretFromApp, getAp
 import { revalidatePath } from "next/cache"
 import { generateSSHKeyPair } from "@/lib/ssh"
 import { addDeployKey } from "@/lib/github"
-import { k8sCustomApi, k8sCoreApi } from "@/lib/k8s"
+import { k8sMergePatch, k8sCoreApi } from "@/lib/k8s"
 
 export async function loadSecrets(namespace: string, appName: string) {
     const session = await auth()
@@ -64,16 +64,13 @@ export async function setupAppSSH(namespace: string, appName: string, repoUrl: s
                 authMethod: "ssh"
             }
         }
-        await k8sCustomApi.patchNamespacedCustomObject({
+        await k8sMergePatch({
             group: "gitship.io",
             version: "v1alpha1",
             namespace,
             plural: "gitshipapps",
             name: appName,
             body: patch
-        }, {
-            // @ts-expect-error - headers is missing in ConfigurationOptions but supported at runtime
-            headers: { "Content-Type": "application/merge-patch+json" }
         })
 
         revalidatePath(`/app/${namespace}/${appName}`)

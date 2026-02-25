@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
-import { k8sCustomApi } from "@/lib/k8s"
+import { k8sMergePatch } from "@/lib/k8s"
 import { hasNamespaceAccess } from "@/lib/auth-utils"
 
 export async function PATCH(
@@ -21,32 +21,24 @@ export async function PATCH(
 
     if (!patchData.spec) return NextResponse.json({ ok: true })
 
-    const patch = {
-      spec: patchData.spec
-    }
-
-    await k8sCustomApi.patchNamespacedCustomObject({
+    await k8sMergePatch({
       group: "gitship.io",
       version: "v1alpha1",
       namespace,
       plural: "gitshipapps",
       name,
-      body: patch
-    }, {
-      // @ts-expect-error - headers is missing in ConfigurationOptions but supported at runtime
-      headers: { "Content-Type": "application/merge-patch+json" }
+      body: { spec: patchData.spec }
     })
 
     console.log(`[API] SUCCESS: Patched GitshipApp ${name} in ${namespace}`)
     return NextResponse.json({ ok: true })
   } catch (e: unknown) {
     // @ts-expect-error dynamic access
-    console.error("Failed to patch app:", e.body?.message || e.message)
+    console.error("Failed to patch app:", e.message)
     return NextResponse.json(
       // @ts-expect-error dynamic access
-      { error: e.body?.message || e.message },
+      { error: e.message },
       { status: 500 }
     )
   }
 }
-

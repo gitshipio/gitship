@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { resolveUserSession } from "@/lib/auth-utils"
 import { getGitshipIntegrations } from "@/lib/api"
-import { k8sCustomApi } from "@/lib/k8s"
+import { k8sCustomApi, k8sMergePatch } from "@/lib/k8s"
 
 export async function GET() {
     const session = await auth()
@@ -73,17 +73,14 @@ export async function PATCH(req: NextRequest) {
             spec: patchData.spec
         }
 
-        await k8sCustomApi.patchNamespacedCustomObject({
+        await k8sMergePatch({
             group: "gitship.io",
             version: "v1alpha1",
             namespace,
             plural: "gitshipintegrations",
             name,
             body: patch
-                    }, {
-                        // @ts-expect-error - headers is missing in ConfigurationOptions but supported at runtime
-                        headers: { "Content-Type": "application/merge-patch+json" }
-                    })
+        })
         console.log(`[API] SUCCESS: Patched GitshipIntegration ${name} in ${namespace}`)
         return NextResponse.json({ ok: true })
     } catch (e: unknown) {

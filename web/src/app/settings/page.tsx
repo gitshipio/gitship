@@ -1,7 +1,7 @@
 import { auth } from "@/auth"
 import { getGitshipUser } from "@/lib/api"
 import { RegistrySettings } from "@/components/registry-settings"
-import { UserQuotaSettings } from "@/components/user-quota-settings"
+
 import { GitHubAppSettings } from "@/components/github-app-settings"
 import { getGitHubInstallation } from "@/lib/github"
 import { redirect } from "next/navigation"
@@ -57,15 +57,6 @@ export default async function SettingsPage() {
 
             {/* Content - Narrower for better readability but aligned to the container */}
             <div className="max-w-4xl space-y-12">
-                <section className="space-y-6">
-                    <div>
-                        <h2 className="text-xl font-semibold">Resource Quotas</h2>
-                        <p className="text-sm text-muted-foreground mt-1">
-                            Control your global account limits and build performance.
-                        </p>
-                    </div>
-                    <UserQuotaSettings userId={internalId} quotas={user.spec.quotas || {}} />
-                </section>
 
                 <section className="space-y-6">
                     <div>

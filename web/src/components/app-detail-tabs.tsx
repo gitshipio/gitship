@@ -13,6 +13,7 @@ import { AppConfiguration } from "@/components/app-configuration"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { useTransition } from "react"
 import { Button } from "@/components/ui/button"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 
 function timeAgo(dateStr?: string): string {
     if (!dateStr) return "n/a"
@@ -29,7 +30,7 @@ function timeAgo(dateStr?: string): string {
 export function AppDetailTabs({ app }: { app: GitshipApp }) {
     const ready = app.status?.readyReplicas ?? 0
     const desired = app.status?.desiredReplicas ?? 0
-    
+
     const searchParams = useSearchParams()
     const router = useRouter()
     const pathname = usePathname()
@@ -73,16 +74,34 @@ export function AppDetailTabs({ app }: { app: GitshipApp }) {
                     <Card className="md:col-span-2">
                         <CardHeader className="flex flex-row items-center justify-between border-b bg-muted/10">
                             <CardTitle>Overview</CardTitle>
-                            <Button 
-                                variant="outline" 
-                                size="sm" 
-                                onClick={handleRebuild} 
-                                disabled={isPending}
-                                className="h-8 gap-2 font-bold hover:bg-primary hover:text-primary-foreground transition-all"
-                            >
-                                <RotateCcw className={cn("w-3.5 h-3.5", isPending && "animate-spin")} />
-                                {isPending ? "Syncing..." : "Rebuild & Resync"}
-                            </Button>
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button 
+                                        variant="outline" 
+                                        size="sm" 
+                                        disabled={isPending}
+                                        className="h-8 gap-2 font-bold hover:bg-destructive hover:text-destructive-foreground transition-all"
+                                    >
+                                        <RotateCcw className={cn("w-3.5 h-3.5", isPending && "animate-spin")} />
+                                        {isPending ? "Rebuilding..." : "Rebuild & Resync"}
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>Rebuild & Resync</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            This will <strong>completely delete</strong> the current deployment and rebuild the app from scratch with your current settings. 
+                                            The app will be <strong>unavailable</strong> during the rebuild process.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction onClick={handleRebuild} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                            Confirm Rebuild
+                                        </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
                         </CardHeader>
                         <CardContent className="pt-6">
                             <div className="grid grid-cols-2 gap-4">
@@ -193,9 +212,9 @@ export function AppDetailTabs({ app }: { app: GitshipApp }) {
 
             {/* Logs Tab */}
             <TabsContent value="logs" className="mt-6">
-                <AppLogs 
-                    appName={app.metadata.name} 
-                    namespace={app.metadata.namespace} 
+                <AppLogs
+                    appName={app.metadata.name}
+                    namespace={app.metadata.namespace}
                     history={app.status?.buildHistory}
                 />
             </TabsContent>
@@ -223,11 +242,10 @@ export function AppDetailTabs({ app }: { app: GitshipApp }) {
 
             {/* Stats Tab */}
             <TabsContent value="stats" className="mt-6">
-                <AppStats 
-                    appName={app.metadata.name} 
-                    namespace={app.metadata.namespace} 
+                <AppStats
+                    appName={app.metadata.name}
+                    namespace={app.metadata.namespace}
                     limits={app.spec.resources}
-                    buildLimits={app.spec.buildResources}
                 />
             </TabsContent>
         </Tabs>

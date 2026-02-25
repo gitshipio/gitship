@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { cn, stripUnits } from "@/lib/utils"
+import { cn } from "@/lib/utils"
 
 export function UserIntegrations() {
     const [integrations, setIntegrations] = useState<GitshipIntegration[]>([])
@@ -20,12 +20,10 @@ export function UserIntegrations() {
     const [cfToken, setCfToken] = useState("")
     const [cmEmail, setCmEmail] = useState("")
     const [cmDnsToken, setCmDnsToken] = useState("")
-    const [cpu, setCpu] = useState("100")
-    const [memory, setMemory] = useState("128")
-    const [replicas, setReplicas] = useState(1)
     const [dialogOpen, setDialogOpen] = useState(false)
     const [dialogOpenCm, setDialogOpenCm] = useState(false)
     const [editIntegration, setEditIntegration] = useState<GitshipIntegration | null>(null)
+    const [editConfig, setEditConfig] = useState<Record<string, string>>({})
     const [error, setError] = useState<string | null>(null)
 
     const fetchIntegrations = async () => {
@@ -56,19 +54,12 @@ export function UserIntegrations() {
                 body: JSON.stringify({
                     type: "cloudflare-tunnel",
                     name: "cloudflare-tunnel",
-                    config: { token: cfToken },
-                    resources: { 
-                        cpu: cpu.trim() + "m", 
-                        memory: memory.trim() + "Mi" 
-                    },
-                    replicas
+                    config: { token: cfToken }
                 })
             })
             if (res.ok) {
                 await fetchIntegrations()
                 setCfToken("")
-                setCpu("100")
-                setMemory("128")
                 setDialogOpen(false)
             } else {
                 const data = await res.json()
@@ -115,7 +106,7 @@ export function UserIntegrations() {
         }
     }
 
-    const updateIntegrationResources = async () => {
+    const updateIntegrationConfig = async () => {
         if (!editIntegration) return
         setInstalling(true)
         setError(null)
@@ -127,11 +118,7 @@ export function UserIntegrations() {
                     name: editIntegration.metadata.name,
                     patch: {
                         spec: {
-                            resources: { 
-                                cpu: cpu.trim() + "m", 
-                                memory: memory.trim() + "Mi" 
-                            },
-                            replicas
+                            config: editConfig
                         }
                     }
                 })
@@ -139,6 +126,7 @@ export function UserIntegrations() {
             if (res.ok) {
                 await fetchIntegrations()
                 setEditIntegration(null)
+                setEditConfig({})
             } else {
                 const data = await res.json()
                 setError(data.error || "Failed to update integration")
@@ -203,20 +191,6 @@ export function UserIntegrations() {
                                 <p className="text-[10px] text-muted-foreground">
                                     You can find this in your Cloudflare Zero Trust dashboard under Networks &rarr; Tunnels.
                                 </p>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="cpu">CPU (mCore)</Label>
-                                    <Input id="cpu" value={cpu} onChange={(e) => setCpu(e.target.value)} className="font-mono text-sm" placeholder="100" />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="memory">RAM (MiB)</Label>
-                                    <Input id="memory" value={memory} onChange={(e) => setMemory(e.target.value)} className="font-mono text-sm" placeholder="128" />
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="replicas">Desired Replicas</Label>
-                                <Input id="replicas" type="number" value={replicas} onChange={(e) => setReplicas(parseInt(e.target.value) || 0)} className="font-mono text-sm" />
                             </div>
                         </div>
                         <DialogFooter>
@@ -334,24 +308,22 @@ export function UserIntegrations() {
                             <div className="flex items-center justify-between mt-4">
                                 <div className="flex gap-2">
                                     <Dialog open={!!editIntegration} onOpenChange={(open) => {
-                                        if (!open) setEditIntegration(null)
+                                        if (!open) { setEditIntegration(null); setEditConfig({}); }
                                     }}>
                                         <DialogTrigger asChild>
                                             <Button variant="ghost" size="sm" className="h-8 gap-1.5" onClick={() => {
                                                 setEditIntegration(int)
-                                                setCpu(stripUnits(int.spec.resources?.cpu, 'cpu'))
-                                                setMemory(stripUnits(int.spec.resources?.memory, 'mem'))
-                                                setReplicas(int.spec.replicas ?? 1)
+                                                setEditConfig(int.spec.config || {})
                                                 setError(null)
                                             }}>
-                                                <Settings2 className="w-3.5 h-3.5" /> Adjust
+                                                <Settings2 className="w-3.5 h-3.5" /> Edit
                                             </Button>
                                         </DialogTrigger>
                                         <DialogContent>
                                             <DialogHeader>
-                                                <DialogTitle>Adjust Resources: {int.metadata.name}</DialogTitle>
+                                                <DialogTitle>Edit: {int.metadata.name}</DialogTitle>
                                                 <DialogDescription>
-                                                    Modify CPU and RAM limits for this integration.
+                                                    Update the configuration for this integration.
                                                 </DialogDescription>
                                             </DialogHeader>
                                             <div className="space-y-4 py-4">
@@ -360,25 +332,47 @@ export function UserIntegrations() {
                                                         <AlertCircle className="w-4 h-4" /> {error}
                                                     </div>
                                                 )}
-                                                <div className="grid grid-cols-2 gap-4">
+                                                {int.spec.type === "cloudflare-tunnel" && (
                                                     <div className="space-y-2">
-                                                        <Label htmlFor="edit-cpu">CPU (mCore)</Label>
-                                                        <Input id="edit-cpu" value={cpu} onChange={(e) => setCpu(e.target.value)} className="font-mono text-sm" />
+                                                        <Label htmlFor="edit-token">Tunnel Token</Label>
+                                                        <Input 
+                                                            id="edit-token" 
+                                                            placeholder="New Cloudflare Tunnel Token"
+                                                            value={editConfig.token || ""} 
+                                                            onChange={(e) => setEditConfig({ ...editConfig, token: e.target.value })} 
+                                                            className="font-mono text-sm" 
+                                                        />
                                                     </div>
-                                                    <div className="space-y-2">
-                                                        <Label htmlFor="edit-memory">RAM (MiB)</Label>
-                                                        <Input id="edit-memory" value={memory} onChange={(e) => setMemory(e.target.value)} className="font-mono text-sm" />
-                                                    </div>
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label htmlFor="edit-replicas">Desired Replicas</Label>
-                                                    <Input id="edit-replicas" type="number" value={replicas} onChange={(e) => setReplicas(parseInt(e.target.value) || 0)} className="font-mono text-sm" />
-                                                </div>
+                                                )}
+                                                {int.spec.type === "cert-manager" && (
+                                                    <>
+                                                        <div className="space-y-2">
+                                                            <Label htmlFor="edit-email">Email Address</Label>
+                                                            <Input 
+                                                                id="edit-email" 
+                                                                placeholder="admin@example.com"
+                                                                value={editConfig.email || ""} 
+                                                                onChange={(e) => setEditConfig({ ...editConfig, email: e.target.value })} 
+                                                                className="text-sm" 
+                                                            />
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <Label htmlFor="edit-dns-token">Cloudflare API Token (Optional)</Label>
+                                                            <Input 
+                                                                id="edit-dns-token" 
+                                                                placeholder="Cloudflare API Token for DNS-01"
+                                                                value={editConfig.dnsToken || ""} 
+                                                                onChange={(e) => setEditConfig({ ...editConfig, dnsToken: e.target.value })} 
+                                                                className="font-mono text-sm" 
+                                                            />
+                                                        </div>
+                                                    </>
+                                                )}
                                             </div>
                                             <DialogFooter>
-                                                <Button onClick={updateIntegrationResources} disabled={installing}>
+                                                <Button onClick={updateIntegrationConfig} disabled={installing}>
                                                     {installing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                                    Apply Changes
+                                                    Save Changes
                                                 </Button>
                                             </DialogFooter>
                                         </DialogContent>

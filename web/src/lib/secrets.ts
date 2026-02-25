@@ -1,4 +1,4 @@
-import { k8sCoreApi, k8sCustomApi } from "@/lib/k8s"
+import { k8sCoreApi, k8sCustomApi, k8sMergePatch } from "@/lib/k8s"
 import { GitshipApp } from "@/lib/types"
 
 export async function getAppSecrets(namespace: string, appName: string) {
@@ -76,7 +76,7 @@ export async function bindSecretToApp(namespace: string, appName: string, secret
         
         if (!refs.includes(secretName)) {
             refs.push(secretName)
-            await k8sCustomApi.patchNamespacedCustomObject({
+            await k8sMergePatch({
                 group: "gitship.io",
                 version: "v1alpha1",
                 namespace,
@@ -87,10 +87,8 @@ export async function bindSecretToApp(namespace: string, appName: string, secret
                         secretRefs: refs
                     }
                 }
-                            }, {
-                                // @ts-expect-error - headers is missing in ConfigurationOptions but supported at runtime
-                                headers: { "Content-Type": "application/merge-patch+json" }
-                            })        }
+            })
+        }
   } catch (e: unknown) {
     // @ts-expect-error dynamic access
     throw new Error(e.body?.message || e.message)
@@ -111,7 +109,7 @@ export async function unbindSecretFromApp(namespace: string, appName: string, se
         
         const newRefs = refs.filter(r => r !== secretName)
         
-        await k8sCustomApi.patchNamespacedCustomObject({
+        await k8sMergePatch({
             group: "gitship.io",
             version: "v1alpha1",
             namespace,
@@ -122,10 +120,7 @@ export async function unbindSecretFromApp(namespace: string, appName: string, se
                     secretRefs: newRefs
                 }
             }
-                        }, {
-                            // @ts-expect-error - headers is missing in ConfigurationOptions but supported at runtime
-                            headers: { "Content-Type": "application/merge-patch+json" }
-                        })            
+        })
   } catch (e: unknown) {
     // @ts-expect-error dynamic access
     throw new Error(e.body?.message || e.message)

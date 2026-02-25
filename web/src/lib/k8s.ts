@@ -13,3 +13,40 @@ export const k8sBatchApi = kc.makeApiClient(k8s.BatchV1Api);
 export const k8sCustomApi = kc.makeApiClient(k8s.CustomObjectsApi);
 export const k8sNetworkingApi = kc.makeApiClient(k8s.NetworkingV1Api);
 
+/**
+ * Custom merge-patch for Kubernetes CRDs that bypasses @kubernetes/client-node's
+ * broken Content-Type handling. The library's patchNamespacedCustomObject sends
+ * `application/json-patch+json` regardless of what you set, causing decode errors.
+ */
+export async function k8sMergePatch(opts: {
+  group: string;
+  version: string;
+  namespace: string;
+  plural: string;
+  name: string;
+  body: object;
+}): Promise<void> {
+  const cluster = kc.getCurrentCluster();
+  if (!cluster) throw new Error("No active cluster in KubeConfig");
+
+  const url = `${cluster.server}/apis/${opts.group}/${opts.version}/namespaces/${opts.namespace}/${opts.plural}/${opts.name}`;
+
+  // applyToFetchOptions returns { headers, agent, ... } for auth + TLS
+  const fetchInit = await kc.applyToFetchOptions({});
+
+  const res = await fetch(url, {
+    ...fetchInit,
+    method: "PATCH",
+    headers: {
+      ...(fetchInit.headers as Record<string, string>),
+      "Content-Type": "application/merge-patch+json",
+      "Accept": "application/json",
+    },
+    body: JSON.stringify(opts.body),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`K8s PATCH failed (${res.status}): ${text}`);
+  }
+}

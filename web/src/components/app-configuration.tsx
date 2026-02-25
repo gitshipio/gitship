@@ -24,7 +24,7 @@ interface AppConfigurationProps {
         imageName: string
         ports: { name?: string; port: number; targetPort: number; protocol?: string }[]
         resources?: { cpu?: string; memory?: string }
-        buildResources?: { cpu?: string; memory?: string }
+
         healthCheck?: { path?: string; port?: number; initialDelay?: number; timeout?: number }
         domain?: string
         replicas?: number
@@ -45,8 +45,7 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
     const [replicas, setReplicas] = useState(spec?.replicas || 1)
     const [cpu, setCpu] = useState(stripUnits(spec?.resources?.cpu, 'cpu'))
     const [memory, setMemory] = useState(stripUnits(spec?.resources?.memory, 'mem'))
-    const [buildCpu, setBuildCpu] = useState(stripUnits(spec?.buildResources?.cpu, 'cpu'))
-    const [buildMemory, setBuildMemory] = useState(stripUnits(spec?.buildResources?.memory, 'mem'))
+
     const [hcPath, setHcPath] = useState(spec?.healthCheck?.path ?? "")
     const [hcPort, setHcPort] = useState(spec?.healthCheck?.port ?? 8080)
     const [sourceType, setSourceType] = useState<"branch" | "tag" | "commit">(spec?.source?.type ?? "branch")
@@ -228,9 +227,7 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
                 if (key.trim()) env[key.trim()] = value
             })
 
-            const buildRes: { cpu?: string; memory?: string } = {}
-            if (buildCpu.trim()) buildRes.cpu = buildCpu.trim() + "m"
-            if (buildMemory.trim()) buildRes.memory = buildMemory.trim() + "Mi"
+
 
             const patch = {
                 spec: {
@@ -239,7 +236,7 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
                         cpu: cpu.trim() + "m",
                         memory: memory.trim() + "Mi",
                     },
-                    buildResources: (buildRes.cpu || buildRes.memory) ? buildRes : undefined,
+
                     healthCheck: {
                         path: hcPath,
                         port: hcPort,
@@ -334,33 +331,7 @@ export function AppConfiguration({ appName, namespace, spec }: AppConfigurationP
                                     />
                                 </div>
                             </div>
-                            {/* Build Pipeline Resources */}
-                            <div className="border-t pt-4 mt-2">
-                                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">Build Pipeline Limits (optional)</p>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="buildCpu">Build CPU (mCore)</Label>
-                                        <Input
-                                            id="buildCpu"
-                                            placeholder="same as app"
-                                            value={buildCpu}
-                                            onChange={(e) => setBuildCpu(e.target.value)}
-                                            className="h-11 border-2 font-mono"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="buildMemory">Build RAM (MiB)</Label>
-                                        <Input
-                                            id="buildMemory"
-                                            placeholder="same as app"
-                                            value={buildMemory}
-                                            onChange={(e) => setBuildMemory(e.target.value)}
-                                            className="h-11 border-2 font-mono"
-                                        />
-                                    </div>
-                                </div>
-                                <p className="text-[10px] text-muted-foreground mt-1">Leave blank to use app resource limits for builds</p>
-                            </div>
+
                         </CardContent>
                     </Card>
 

@@ -1,5 +1,5 @@
 import { auth } from "@/auth"
-import { k8sCustomApi } from "@/lib/k8s"
+import { k8sMergePatch } from "@/lib/k8s"
 import { NextResponse } from "next/server"
 import { hasNamespaceAccess } from "@/lib/auth-utils"
 
@@ -20,25 +20,20 @@ export async function POST(
   if (!commitId) return NextResponse.json({ error: "commitId is required" }, { status: 400 })
 
   try {
-    const patch = {
-      spec: {
-        source: {
-          type: "commit",
-          value: commitId
-        }
-      }
-    }
-
-    await k8sCustomApi.patchNamespacedCustomObject({
+    await k8sMergePatch({
       group: "gitship.io",
       version: "v1alpha1",
       namespace,
       plural: "gitshipapps",
       name,
-      body: patch
-    }, {
-      // @ts-expect-error - headers is missing in ConfigurationOptions but supported at runtime
-      headers: { "Content-Type": "application/merge-patch+json" }
+      body: {
+        spec: {
+          source: {
+            type: "commit",
+            value: commitId
+          }
+        }
+      }
     })
 
     return NextResponse.json({ ok: true })
