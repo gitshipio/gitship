@@ -75,7 +75,9 @@ export async function GET() {
         memoryUsage: number,
         storageUsage: number,
         podCount: number,
-        replicas: number
+        replicas: number,
+        buildCpuLimit?: string,
+        buildMemoryLimit?: string
     }> = {}
 
     appsItems.forEach((app: GitshipApp) => {
@@ -86,6 +88,8 @@ export async function GET() {
             cpuLimit: app.spec.resources?.cpu || "500m",
             memoryLimit: app.spec.resources?.memory || "1Gi",
             storageLimit: app.spec.resources?.storage || "1Gi",
+            buildCpuLimit: app.spec.buildResources?.cpu || "",
+            buildMemoryLimit: app.spec.buildResources?.memory || "",
             cpuUsage: 0,
             memoryUsage: 0,
             storageUsage: 0,

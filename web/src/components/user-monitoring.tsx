@@ -20,6 +20,8 @@ interface AppMetrics {
     memoryLimit: string
     storageUsage: number
     storageLimit: string
+    buildCpuLimit?: string
+    buildMemoryLimit?: string
     podCount: number
     replicas: number
 }
@@ -248,6 +250,8 @@ function AppResourceRow({ app, onUpdate }: { app: AppMetrics, onUpdate: () => vo
     const [cpu, setCpu] = useState(stripUnits(app.cpuLimit, 'cpu'))
     const [mem, setMem] = useState(stripUnits(app.memoryLimit, 'mem'))
     const [storage, setStorage] = useState(stripUnits(app.storageLimit, 'mem'))
+    const [buildCpu, setBuildCpu] = useState(stripUnits(app.buildCpuLimit || "", 'cpu'))
+    const [buildMemory, setBuildMemory] = useState(stripUnits(app.buildMemoryLimit || "", 'mem'))
     const [replicas, setReplicas] = useState(app.replicas)
 
     // Sync state when app prop changes, but ONLY when not editing
@@ -256,6 +260,8 @@ function AppResourceRow({ app, onUpdate }: { app: AppMetrics, onUpdate: () => vo
             setCpu(stripUnits(app.cpuLimit, 'cpu'))
             setMem(stripUnits(app.memoryLimit, 'mem'))
             setStorage(stripUnits(app.storageLimit, 'mem'))
+            setBuildCpu(stripUnits(app.buildCpuLimit || "", 'cpu'))
+            setBuildMemory(stripUnits(app.buildMemoryLimit || "", 'mem'))
             setReplicas(app.replicas)
         }
     }, [app, editing])
@@ -266,6 +272,8 @@ function AppResourceRow({ app, onUpdate }: { app: AppMetrics, onUpdate: () => vo
             const cpuVal = cpu.trim() + "m"
             const memVal = mem.trim() + "Mi"
             const storageVal = storage.trim() + "Mi"
+            const buildCpuVal = buildCpu ? buildCpu.trim() + "m" : undefined
+            const buildMemVal = buildMemory ? buildMemory.trim() + "Mi" : undefined
 
             let res;
             if (app.type === "app") {
@@ -278,6 +286,10 @@ function AppResourceRow({ app, onUpdate }: { app: AppMetrics, onUpdate: () => vo
                                 cpu: cpuVal,
                                 memory: memVal,
                                 storage: storageVal
+                            },
+                            buildResources: {
+                                cpu: buildCpuVal,
+                                memory: buildMemVal
                             },
                             replicas
                         }
@@ -398,10 +410,20 @@ function AppResourceRow({ app, onUpdate }: { app: AppMetrics, onUpdate: () => vo
                                 <Input type="number" value={replicas} onChange={e => setReplicas(parseInt(e.target.value) || 0)} className="h-8 w-12 font-mono text-[10px]" />
                             </div>
                             {app.type === "app" && (
-                                <div className="space-y-1">
-                                    <span className="text-[8px] font-black uppercase ml-1 opacity-50">MiB Disk</span>
-                                    <Input value={storage} onChange={e => setStorage(e.target.value)} className="h-8 w-16 font-mono text-[10px]" />
-                                </div>
+                                <>
+                                    <div className="space-y-1">
+                                        <span className="text-[8px] font-black uppercase ml-1 opacity-50">MiB Disk</span>
+                                        <Input value={storage} onChange={e => setStorage(e.target.value)} className="h-8 w-16 font-mono text-[10px]" />
+                                    </div>
+                                    <div className="space-y-1 border-l pl-3 ml-2">
+                                        <span className="text-[8px] font-black uppercase ml-1 opacity-50 text-emerald-500">Build mCore</span>
+                                        <Input value={buildCpu} onChange={e => setBuildCpu(e.target.value)} className="h-8 w-16 font-mono text-[10px]" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <span className="text-[8px] font-black uppercase ml-1 opacity-50 text-emerald-500">Build MiB</span>
+                                        <Input value={buildMemory} onChange={e => setBuildMemory(e.target.value)} className="h-8 w-16 font-mono text-[10px]" />
+                                    </div>
+                                </>
                             )}
                             <div className="flex gap-1 pl-2">
                                 <Button size="icon" variant="ghost" className="h-8 w-8 text-emerald-500" onClick={handleSave} disabled={saving}>
