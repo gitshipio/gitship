@@ -34,6 +34,8 @@ export async function POST(req: NextRequest) {
         plural: "gitshipusers",
         name: internalId,
         body: patch
+    }, {
+        headers: { "Content-Type": "application/merge-patch+json" }
     })
 
     console.log(`[API] Successfully patched GitshipUser ${internalId}`)
@@ -70,6 +72,8 @@ export async function DELETE(req: NextRequest) {
           plural: "gitshipusers",
           name: internalId,
           body: patch
+      }, {
+          headers: { "Content-Type": "application/merge-patch+json" }
       })
   
       return NextResponse.json({ ok: true })

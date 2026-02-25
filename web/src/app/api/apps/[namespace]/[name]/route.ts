@@ -32,6 +32,8 @@ export async function PATCH(
       plural: "gitshipapps",
       name,
       body: patch
+    }, {
+      headers: { "Content-Type": "application/merge-patch+json" }
     })
 
     console.log(`[API] SUCCESS: Patched GitshipApp ${name} in ${namespace}`)

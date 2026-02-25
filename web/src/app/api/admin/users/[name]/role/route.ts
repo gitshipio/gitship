@@ -35,6 +35,8 @@ export async function PATCH(
       plural: "gitshipusers",
       name: name,
       body: patch
+    }, {
+      headers: { "Content-Type": "application/merge-patch+json" }
     })
 
     return NextResponse.json({ ok: true })

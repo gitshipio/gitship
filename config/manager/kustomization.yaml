@@ -7,4 +7,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: gitshipio/gitship-controller
-  newTag: v1.0.10
+  newTag: v1.0.11

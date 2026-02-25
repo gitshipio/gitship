@@ -71,6 +71,8 @@ export async function setupAppSSH(namespace: string, appName: string, repoUrl: s
             plural: "gitshipapps",
             name: appName,
             body: patch
+        }, {
+            headers: { "Content-Type": "application/merge-patch+json" }
         })
 
         revalidatePath(`/app/${namespace}/${appName}`)

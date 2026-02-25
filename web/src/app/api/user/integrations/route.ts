@@ -80,6 +80,8 @@ export async function PATCH(req: NextRequest) {
             plural: "gitshipintegrations",
             name,
             body: patch
+        }, {
+            headers: { "Content-Type": "application/merge-patch+json" }
         })
 
         console.log(`[API] SUCCESS: Patched GitshipIntegration ${name} in ${namespace}`)

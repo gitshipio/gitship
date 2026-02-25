@@ -39,6 +39,8 @@ export async function PATCH(req: NextRequest) {
             plural: "gitshipusers",
             name: internalId,
             body: patch
+        }, {
+            headers: { "Content-Type": "application/merge-patch+json" }
         })
 
         return NextResponse.json({ ok: true })

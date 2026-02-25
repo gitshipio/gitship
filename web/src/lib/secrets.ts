@@ -87,6 +87,8 @@ export async function bindSecretToApp(namespace: string, appName: string, secret
                         secretRefs: refs
                     }
                 }
+            }, {
+                headers: { "Content-Type": "application/merge-patch+json" }
             })
         }
   } catch (e: unknown) {
@@ -120,6 +122,8 @@ export async function unbindSecretFromApp(namespace: string, appName: string, se
                     secretRefs: newRefs
                 }
             }
+        }, {
+            headers: { "Content-Type": "application/merge-patch+json" }
         })
             
   } catch (e: unknown) {
