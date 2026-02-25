@@ -4,9 +4,10 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Download, Search, Pause, Play, Server, RefreshCcw, Terminal, Activity } from "lucide-react"
+import { Download, Search, Pause, Play, Server, RefreshCcw, Terminal, Activity, ShieldCheck } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { AppBuildLogs } from "./app-build-logs"
+import { AppTlsLogs } from "./app-tls-logs"
 
 interface PodInfo {
     name: string
@@ -22,7 +23,7 @@ interface AppLogsProps {
 }
 
 export function AppLogs({ appName, namespace, history }: AppLogsProps) {
-    const [logType, setLogType] = useState<"runtime" | "build">("runtime")
+    const [logType, setLogType] = useState<"runtime" | "build" | "tls">("runtime")
     const [logs, setLogs] = useState<string[]>([])
     const [pods, setPods] = useState<PodInfo[]>([])
     const [selectedPod, setSelectedPod] = useState<string | null>(null)
@@ -126,10 +127,23 @@ export function AppLogs({ appName, namespace, history }: AppLogsProps) {
                 >
                     <Terminal className="w-4 h-4" /> Build Pipeline
                 </button>
+                <button 
+                    onClick={() => setLogType("tls")}
+                    className={cn(
+                        "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all",
+                        logType === "tls" ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20" : "text-muted-foreground hover:bg-muted"
+                    )}
+                >
+                    <ShieldCheck className="w-4 h-4" /> TLS / Cert Logs
+                </button>
             </div>
 
             {logType === "build" ? (
                 <AppBuildLogs appName={appName} namespace={namespace} buildHistory={history} />
+            ) : logType === "tls" ? (
+                <div className="animate-in fade-in slide-in-from-top-2 duration-500">
+                    <AppTlsLogs appName={appName} namespace={namespace} />
+                </div>
             ) : (
                 <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-500">
                     {/* Pod Selector */}

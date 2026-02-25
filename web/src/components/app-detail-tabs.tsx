@@ -10,7 +10,6 @@ import { AppLogs } from "@/components/app-logs"
 import { AppServices } from "@/components/app-services"
 import { AppStats } from "@/components/app-stats"
 import { AppConfiguration } from "@/components/app-configuration"
-import { AppTlsLogs } from "@/components/app-tls-logs"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { useTransition } from "react"
 import { Button } from "@/components/ui/button"
@@ -59,11 +58,10 @@ export function AppDetailTabs({ app }: { app: GitshipApp }) {
 
     return (
         <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
-            <TabsList className="grid w-full grid-cols-6">
+            <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
                 <TabsTrigger value="logs">Logs</TabsTrigger>
                 <TabsTrigger value="services">Services</TabsTrigger>
-                <TabsTrigger value="tls">TLS Logs</TabsTrigger>
                 <TabsTrigger value="config">Configuration</TabsTrigger>
                 <TabsTrigger value="stats">Stats</TabsTrigger>
             </TabsList>
@@ -214,14 +212,6 @@ export function AppDetailTabs({ app }: { app: GitshipApp }) {
                 />
             </TabsContent>
 
-            {/* TLS Tab */}
-            <TabsContent value="tls" className="mt-6">
-                <AppTlsLogs
-                    appName={app.metadata.name}
-                    namespace={app.metadata.namespace}
-                />
-            </TabsContent>
-
             {/* Configuration Tab (Merged Env, Secrets, Volumes) */}
             <TabsContent value="config" className="mt-6">
                 <AppConfiguration
@@ -237,6 +227,7 @@ export function AppDetailTabs({ app }: { app: GitshipApp }) {
                     appName={app.metadata.name} 
                     namespace={app.metadata.namespace} 
                     limits={app.spec.resources}
+                    buildLimits={app.spec.buildResources}
                 />
             </TabsContent>
         </Tabs>
