@@ -50,6 +50,7 @@ export async function ensureGitshipUser(username: string, githubID: number, emai
 
     if (!existing) {
         // Migration logic: Check if a legacy record (username-based) exists
+        const legacyName = username.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/^-|-$/g, "")
         const legacyResp = await k8sCustomApi.getClusterCustomObject({
             group: "gitship.io",
             version: "v1alpha1",
