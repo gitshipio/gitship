@@ -8,6 +8,7 @@ interface AppStatsProps {
     appName: string
     namespace: string
     limits?: { cpu?: string; memory?: string }
+    buildLimits?: { cpu?: string; memory?: string }
 }
 
 interface PodMetrics {
@@ -68,7 +69,7 @@ function BarChart({ value, max, label, unit, color }: { value: number; max: numb
     )
 }
 
-export function AppStats({ appName, namespace, limits }: AppStatsProps) {
+export function AppStats({ appName, namespace, limits, buildLimits }: AppStatsProps) {
     const [metrics, setMetrics] = useState<PodMetrics[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState("")
