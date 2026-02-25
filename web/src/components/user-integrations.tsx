@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Trash2, Cloud, Loader2, Settings2, AlertCircle } from "lucide-react"
+import { Trash2, Cloud, Loader2, Settings2, AlertCircle, ShieldCheck } from "lucide-react"
 import { GitshipIntegration } from "@/lib/types"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
@@ -18,10 +18,13 @@ export function UserIntegrations() {
     const [installing, setInstalling] = useState(false)
     const [deleting, setDeleting] = useState<string | null>(null)
     const [cfToken, setCfToken] = useState("")
+    const [cmEmail, setCmEmail] = useState("")
+    const [cmDnsToken, setCmDnsToken] = useState("")
     const [cpu, setCpu] = useState("100")
     const [memory, setMemory] = useState("128")
     const [replicas, setReplicas] = useState(1)
     const [dialogOpen, setDialogOpen] = useState(false)
+    const [dialogOpenCm, setDialogOpenCm] = useState(false)
     const [editIntegration, setEditIntegration] = useState<GitshipIntegration | null>(null)
     const [error, setError] = useState<string | null>(null)
 
@@ -67,6 +70,40 @@ export function UserIntegrations() {
                 setCpu("100")
                 setMemory("128")
                 setDialogOpen(false)
+            } else {
+                const data = await res.json()
+                setError(data.error || "Failed to install integration")
+            }
+        } catch {
+            setError("An unexpected error occurred")
+        } finally {
+            setInstalling(false)
+        }
+    }
+
+    const installCertManager = async () => {
+        setInstalling(true)
+        setError(null)
+        try {
+            const res = await fetch("/api/user/integrations", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    type: "cert-manager",
+                    name: "cert-manager",
+                    config: { email: cmEmail, dnsToken: cmDnsToken },
+                    resources: { 
+                        cpu: "100m", 
+                        memory: "128Mi" 
+                    },
+                    replicas: 1
+                })
+            })
+            if (res.ok) {
+                await fetchIntegrations()
+                setCmEmail("")
+                setCmDnsToken("")
+                setDialogOpenCm(false)
             } else {
                 const data = await res.json()
                 setError(data.error || "Failed to install integration")
@@ -186,6 +223,64 @@ export function UserIntegrations() {
                             <Button onClick={installCloudflare} disabled={!cfToken || installing}>
                                 {installing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 Install Integration
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            )
+        },
+        {
+            type: "cert-manager",
+            name: "Cert-Manager (HTTPS)",
+            description: "Provision free Let's Encrypt SSL certificates automatically for your domains. Choose HTTP-01 (Email) or DNS-01 (Cloudflare API Token).",
+            icon: <ShieldCheck className="w-10 h-10 text-emerald-500" />,
+            setup: (
+                <Dialog open={dialogOpenCm} onOpenChange={setDialogOpenCm}>
+                    <DialogTrigger asChild>
+                        <Button variant="outline" size="sm" onClick={() => setError(null)}>Configure & Install</Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Enable HTTPS Certificates</DialogTitle>
+                            <DialogDescription>
+                                This will deploy a Let's Encrypt ClusterIssuer for your namespace.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                            {error && (
+                                <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-xs font-bold flex items-center gap-2">
+                                    <AlertCircle className="w-4 h-4" /> {error}
+                                </div>
+                            )}
+                            <div className="space-y-2">
+                                <Label htmlFor="cmEmail">Email Address (Required)</Label>
+                                <Input 
+                                    id="cmEmail" 
+                                    placeholder="admin@example.com" 
+                                    value={cmEmail}
+                                    onChange={(e) => setCmEmail(e.target.value)}
+                                />
+                                <p className="text-[10px] text-muted-foreground">
+                                    Let's Encrypt requires a valid email for certificate expiration notices.
+                                </p>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="cmDnsToken">Cloudflare API Token (Optional, for DNS-01)</Label>
+                                <Input 
+                                    id="cmDnsToken" 
+                                    placeholder="Paste your Cloudflare API Token (Edit zone DNS)" 
+                                    value={cmDnsToken}
+                                    onChange={(e) => setCmDnsToken(e.target.value)}
+                                />
+                                <p className="text-[10px] text-muted-foreground">
+                                    If left empty, HTTP-01 challenge will be used (requires public IP routing to port 80).
+                                </p>
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button onClick={installCertManager} disabled={!cmEmail || installing}>
+                                {installing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Enable HTTPS
                             </Button>
                         </DialogFooter>
                     </DialogContent>

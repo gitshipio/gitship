@@ -114,21 +114,36 @@ func (r *GitshipUserReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	// Ensure Cert-Manager Issuer exists if integration is enabled
 	integrations := &gitshipiov1alpha1.GitshipIntegrationList{}
 	hasCertManager := false
+	var cmIntegration *gitshipiov1alpha1.GitshipIntegration
 	if err := r.List(ctx, integrations, client.InNamespace(nsName)); err == nil {
-		for _, integration := range integrations.Items {
+		for i, integration := range integrations.Items {
 			if strings.ToLower(integration.Spec.Type) == "cert-manager" && integration.Spec.Enabled {
 				hasCertManager = true
+				cmIntegration = &integrations.Items[i]
 				break
 			}
 		}
 	}
 
-	if hasCertManager && gitshipUser.Spec.Email != "" {
-		if err := r.ensureIssuer(ctx, nsName, gitshipUser.Spec.Email, gitshipUser); err != nil {
-			log.Error(err, "Failed to sync issuer", "namespace", nsName)
-			return ctrl.Result{}, err
+	if hasCertManager {
+		email := gitshipUser.Spec.Email
+		dnsToken := ""
+		if cmIntegration != nil && cmIntegration.Spec.Config != nil {
+			if e, ok := cmIntegration.Spec.Config["email"]; ok && e != "" {
+				email = e
+			}
+			if t, ok := cmIntegration.Spec.Config["dnsToken"]; ok {
+				dnsToken = t
+			}
 		}
-	} else if !hasCertManager {
+
+		if email != "" {
+			if err := r.ensureIssuer(ctx, nsName, email, dnsToken, gitshipUser); err != nil {
+				log.Error(err, "Failed to sync issuer", "namespace", nsName)
+				return ctrl.Result{}, err
+			}
+		}
+	} else {
 		// Cleanup issuer if integration is removed
 		issuer := &cmv1.Issuer{}
 		if err := r.Get(ctx, client.ObjectKey{Namespace: nsName, Name: "letsencrypt-prod"}, issuer); err == nil {
@@ -322,13 +337,62 @@ func (r *GitshipUserReconciler) ensureNetworkPolicy(ctx context.Context, namespa
 	return r.Create(ctx, newPolicy)
 }
 
-func (r *GitshipUserReconciler) ensureIssuer(ctx context.Context, namespace string, email string, gitshipUser *gitshipiov1alpha1.GitshipUser) error {
+func (r *GitshipUserReconciler) ensureIssuer(ctx context.Context, namespace string, email string, dnsToken string, gitshipUser *gitshipiov1alpha1.GitshipUser) error {
 	issuerName := "letsencrypt-prod"
 	issuer := &cmv1.Issuer{}
 	err := r.Get(ctx, client.ObjectKey{Namespace: namespace, Name: issuerName}, issuer)
 
 	if err != nil && client.IgnoreNotFound(err) != nil {
 		return err
+	}
+
+	var solvers []acmev1.ACMEChallengeSolver
+	if dnsToken != "" {
+		// Create/Update Secret for Cloudflare token
+		secretName := "cloudflare-api-token-secret"
+		secret := &corev1.Secret{}
+		errSec := r.Get(ctx, client.ObjectKey{Namespace: namespace, Name: secretName}, secret)
+		if errSec != nil {
+			newSec := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      secretName,
+					Namespace: namespace,
+				},
+				StringData: map[string]string{
+					"api-token": dnsToken,
+				},
+			}
+			_ = ctrl.SetControllerReference(gitshipUser, newSec, r.Scheme)
+			_ = r.Create(ctx, newSec)
+		} else if string(secret.Data["api-token"]) != dnsToken {
+			secret.StringData = map[string]string{"api-token": dnsToken}
+			_ = r.Update(ctx, secret)
+		}
+
+		solvers = []acmev1.ACMEChallengeSolver{
+			{
+				DNS01: &acmev1.ACMEChallengeSolverDNS01{
+					Cloudflare: &acmev1.ACMEIssuerDNS01ProviderCloudflare{
+						APIToken: &cmmeta.SecretKeySelector{
+							LocalObjectReference: cmmeta.LocalObjectReference{
+								Name: secretName,
+							},
+							Key: "api-token",
+						},
+					},
+				},
+			},
+		}
+	} else {
+		solvers = []acmev1.ACMEChallengeSolver{
+			{
+				HTTP01: &acmev1.ACMEChallengeSolverHTTP01{
+					Ingress: &acmev1.ACMEChallengeSolverHTTP01Ingress{
+						Class: &r.Config.IngressClassName,
+					},
+				},
+			},
+		}
 	}
 
 	spec := cmv1.IssuerSpec{
@@ -341,15 +405,7 @@ func (r *GitshipUserReconciler) ensureIssuer(ctx context.Context, namespace stri
 						Name: "letsencrypt-prod-account-key",
 					},
 				},
-				Solvers: []acmev1.ACMEChallengeSolver{
-					{
-						HTTP01: &acmev1.ACMEChallengeSolverHTTP01{
-							Ingress: &acmev1.ACMEChallengeSolverHTTP01Ingress{
-								Class: &r.Config.IngressClassName,
-							},
-						},
-					},
-				},
+				Solvers: solvers,
 			},
 		},
 	}
