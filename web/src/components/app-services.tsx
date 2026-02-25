@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useTransition } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Globe, Network, Save, Loader2, Lock, Plus, Trash2, ArrowRight, ChevronDown, Copy, Check } from "lucide-react"
+import { Globe, Network, Save, Loader2, Lock, Plus, Trash2, ArrowRight, ChevronDown, Copy, Check, ShieldAlert } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
@@ -36,6 +36,7 @@ export function AppServices({ appName, namespace, initialIngresses, initialPorts
   const [services, setServices] = useState<ServiceInfo[]>([])
   const [ingressesStatus, setIngressStatus] = useState<IngressInfo[]>([])
   const [loading, setLoading] = useState(true)
+  const [hasCertManager, setHasCertManager] = useState(false)
   
   const [ports, setPorts] = useState(initialPorts || [{ name: "http", port: 80, targetPort: 8080, protocol: "TCP" }])
   const [ingresses, setIngresses] = useState(initialIngresses || [])
@@ -63,11 +64,21 @@ export function AppServices({ appName, namespace, initialIngresses, initialPorts
   const fetchNetworking = useCallback(async () => {
     if (!appName || !namespace) return
     try {
-      const res = await fetch(`/api/apps/${namespace}/${appName}/networking`)
-      if (res.ok) {
-        const data = await res.json()
+      const [netRes, intRes] = await Promise.all([
+          fetch(`/api/apps/${namespace}/${appName}/networking`),
+          fetch(`/api/integrations?namespace=${namespace}`)
+      ])
+      
+      if (netRes.ok) {
+        const data = await netRes.json()
         setServices(data.services || [])
         setIngressStatus(data.ingresses || [])
+      }
+      
+      if (intRes.ok) {
+          const data = await intRes.json()
+          const cm = data.items?.find((i: any) => i.spec.type === "cert-manager" && i.spec.enabled)
+          setHasCertManager(!!cm)
       }
     } catch {
       // Fallback
@@ -216,11 +227,23 @@ export function AppServices({ appName, namespace, initialIngresses, initialPorts
             )}
             
             <div className="space-y-4">
+                {ingresses.length > 0 && !hasCertManager && (
+                    <div className="p-3 rounded-lg bg-amber-500/10 border-2 border-amber-500/20 flex gap-3 items-start animate-in slide-in-from-top-2">
+                        <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                        <div>
+                            <p className="text-xs font-bold text-amber-700">Cert-Manager Integration Required for HTTPS</p>
+                            <p className="text-[10px] text-amber-600 leading-tight mt-1">
+                                Go to <strong>Settings</strong> and install the Cert-Manager integration to enable HTTPS for your apps.
+                            </p>
+                        </div>
+                    </div>
+                )}
                 {ingresses.map((ing, idx) => (
                     <IngressRuleRow 
                         key={idx}
                         rule={ing}
                         availablePorts={ports}
+                        hasCertManager={hasCertManager}
                         onUpdate={(field: string, val: string | number | boolean) => updateIngressRule(idx, field, val)}
                         onRemove={() => removeIngressRule(idx)}
                     />
@@ -290,9 +313,10 @@ export function AppServices({ appName, namespace, initialIngresses, initialPorts
   )
 }
 
-function IngressRuleRow({ rule, availablePorts, onUpdate, onRemove }: {
+function IngressRuleRow({ rule, availablePorts, hasCertManager, onUpdate, onRemove }: {
     rule: { host: string; path?: string; servicePort: number; tls?: boolean },
     availablePorts: { name?: string; port: number }[],
+    hasCertManager: boolean,
     onUpdate: (field: string, val: string | number | boolean) => void,
     onRemove: () => void
 }) {
@@ -334,7 +358,7 @@ function IngressRuleRow({ rule, availablePorts, onUpdate, onRemove }: {
                         <Lock className={cn("w-3.5 h-3.5", rule.tls ? "text-primary" : "text-muted-foreground")} />
                         <span className="text-[10px] font-bold uppercase opacity-70">HTTPS</span>
                     </div>
-                    <Switch checked={!!rule.tls} onCheckedChange={(v) => onUpdate("tls", v)} className="scale-75" />
+                    <Switch checked={!!rule.tls} disabled={!hasCertManager} onCheckedChange={(v) => onUpdate("tls", v)} className="scale-75" />
                 </div>
 
                 <div className="md:col-span-2 flex items-center justify-end gap-2">
