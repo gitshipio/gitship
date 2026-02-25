@@ -33,10 +33,10 @@ export async function POST(req: NextRequest) {
         version: "v1alpha1",
         plural: "gitshipusers",
         name: internalId,
-        body: patch
-    }, { 
-        // @ts-expect-error custom headers
-        headers: { "Content-Type": "application/merge-patch+json" } 
+        body: patch,
+        options: {
+            headers: { "Content-Type": "application/merge-patch+json" }
+        }
     })
 
     console.log(`[API] Successfully patched GitshipUser ${internalId}`)
@@ -72,10 +72,10 @@ export async function DELETE(req: NextRequest) {
           version: "v1alpha1",
           plural: "gitshipusers",
           name: internalId,
-          body: patch
-      }, { 
-          // @ts-expect-error custom headers
-          headers: { "Content-Type": "application/merge-patch+json" } 
+          body: patch,
+          options: {
+              headers: { "Content-Type": "application/merge-patch+json" }
+          }
       })
   
       return NextResponse.json({ ok: true })

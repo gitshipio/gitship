@@ -95,10 +95,10 @@ export async function PATCH(req: NextRequest) {
             namespace,
             plural: "gitshipintegrations",
             name,
-            body: patch
-        }, { 
-            // @ts-expect-error custom headers for JSON Patch
-            headers: { "Content-Type": "application/json-patch+json" } 
+            body: patch,
+            options: {
+                headers: { "Content-Type": "application/json-patch+json" }
+            }
         })
 
         console.log(`[API] SUCCESS: Patched GitshipIntegration ${name} in ${namespace}`)

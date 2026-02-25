@@ -69,10 +69,27 @@ func (r *GitshipIntegrationReconciler) Reconcile(ctx context.Context, req ctrl.R
 	switch strings.ToLower(integration.Spec.Type) {
 	case "cloudflare-tunnel":
 		return r.reconcileCloudflareTunnel(ctx, integration)
+	case "cert-manager":
+		return r.reconcileCertManager(ctx, integration)
 	default:
 		log.Info("Unknown integration type", "type", integration.Spec.Type)
 	}
 
+	return ctrl.Result{}, nil
+}
+
+func (r *GitshipIntegrationReconciler) reconcileCertManager(ctx context.Context, integration *gitshipiov1alpha1.GitshipIntegration) (ctrl.Result, error) {
+	// Logic for Issuer creation is handled by GitshipUser controller.
+	// Here we just update the status to show it's active.
+	if integration.Status.Phase != "Ready" {
+		integration.Status.Phase = "Ready"
+		integration.Status.Message = "Cert-Manager integration active"
+		integration.Status.ReadyReplicas = 1
+		integration.Status.DesiredReplicas = 1
+		if err := r.Status().Update(ctx, integration); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
 	return ctrl.Result{}, nil
 }
 

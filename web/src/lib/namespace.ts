@@ -104,10 +104,10 @@ export async function ensureGitshipUser(username: string, githubID: number, emai
                 version: "v1alpha1",
                 plural: "gitshipusers",
                 name: resourceName,
-                body: patch
-            }, { 
-                // @ts-expect-error custom headers
-                headers: { "Content-Type": "application/merge-patch+json" } 
+                body: patch,
+                options: {
+                    headers: { "Content-Type": "application/merge-patch+json" }
+                }
             })
             console.log(`[user] Updated metadata for ${resourceName}: ${username} (${email || "no email"})`)
         }

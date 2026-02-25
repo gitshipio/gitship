@@ -27,10 +27,10 @@ export async function POST(
         namespace,
         plural: "gitshipapps",
         name,
-        body: patch
-    }, {
-        // @ts-expect-error custom headers
-        headers: { "Content-Type": "application/merge-patch+json" }
+        body: patch,
+        options: {
+            headers: { "Content-Type": "application/merge-patch+json" }
+        }
     })
 
     return NextResponse.json({ ok: true })

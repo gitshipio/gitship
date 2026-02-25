@@ -40,9 +40,9 @@ export async function PATCH(
       plural: "gitshipapps",
       name,
       body: patch,
-    }, {
-      // @ts-expect-error custom headers for JSON Patch
-      headers: { "Content-Type": "application/json-patch+json" }
+      options: {
+        headers: { "Content-Type": "application/json-patch+json" }
+      }
     })
 
     console.log(`[API] SUCCESS: Patched GitshipApp ${name} in ${namespace}`)
