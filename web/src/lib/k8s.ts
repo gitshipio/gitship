@@ -31,14 +31,15 @@ export async function k8sMergePatch(opts: {
 
   const url = `${cluster.server}/apis/${opts.group}/${opts.version}/namespaces/${opts.namespace}/${opts.plural}/${opts.name}`;
 
-  // applyToFetchOptions returns { headers, agent, ... } for auth + TLS
+  // applyToFetchOptions returns node-fetch RequestInit (incompatible with global fetch)
+  // so we only extract headers for auth tokens / certs
   const fetchInit = await kc.applyToFetchOptions({});
+  const authHeaders = (fetchInit.headers || {}) as Record<string, string>;
 
   const res = await fetch(url, {
-    ...fetchInit,
     method: "PATCH",
     headers: {
-      ...(fetchInit.headers as Record<string, string>),
+      ...authHeaders,
       "Content-Type": "application/merge-patch+json",
       "Accept": "application/json",
     },
