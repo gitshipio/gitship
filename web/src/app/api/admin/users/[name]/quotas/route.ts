@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
-import { k8sCustomApi } from "@/lib/k8s"
+import { k8sClusterMergePatch } from "@/lib/k8s"
 import { isAdmin as checkAdmin, resolveUserSession } from "@/lib/auth-utils"
 
 export async function PATCH(
@@ -25,15 +25,12 @@ export async function PATCH(
       }
     }
 
-    await k8sCustomApi.patchClusterCustomObject({
+    await k8sClusterMergePatch({
       group: "gitship.io",
       version: "v1alpha1",
       plural: "gitshipusers",
       name: name,
       body: patch
-    }, {
-      // @ts-expect-error - headers is missing in ConfigurationOptions but supported at runtime
-      headers: { "Content-Type": "application/merge-patch+json" }
     })
 
     return NextResponse.json({ ok: true })

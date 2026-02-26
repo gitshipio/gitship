@@ -1,6 +1,6 @@
 // Namespace management utilities
 
-import { k8sCoreApi, k8sNetworkingApi, k8sCustomApi } from "./k8s"
+import { k8sCoreApi, k8sNetworkingApi, k8sCustomApi, k8sClusterMergePatch } from "./k8s"
 
 import { GitshipUser } from "./types"
 
@@ -99,16 +99,13 @@ export async function ensureGitshipUser(username: string, githubID: number, emai
         }
 
         if (needsPatch) {
-            await k8sCustomApi.patchClusterCustomObject({
+            await k8sClusterMergePatch({
                 group: "gitship.io",
                 version: "v1alpha1",
                 plural: "gitshipusers",
                 name: resourceName,
                 body: patch,
-                            }, {
-                                // @ts-expect-error - headers is missing in ConfigurationOptions but supported at runtime
-                                headers: { "Content-Type": "application/merge-patch+json" }
-                            })
+            })
             console.log(`[user] Updated metadata for ${resourceName}: ${username} (${email || "no email"})`)
         }
     }

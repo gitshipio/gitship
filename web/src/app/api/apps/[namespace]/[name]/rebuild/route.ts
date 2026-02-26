@@ -1,5 +1,5 @@
 import { auth } from "@/auth"
-import { k8sAppsApi, k8sCoreApi, k8sMergePatch } from "@/lib/k8s"
+import { k8sAppsApi, k8sMergePatch } from "@/lib/k8s"
 import { NextResponse } from "next/server"
 import { hasNamespaceAccess } from "@/lib/auth-utils"
 
@@ -16,6 +16,7 @@ export async function POST(
 
   try {
     // 1. Delete existing deployment so it gets fully re-created after build
+    //    (deployment deletion cascades to pods automatically)
     try {
       await k8sAppsApi.deleteNamespacedDeployment({ name, namespace })
       console.log(`[API] Deleted deployment ${name} in ${namespace} for full rebuild`)
@@ -26,16 +27,6 @@ export async function POST(
       }
     }
 
-    // 2. Delete all pods for this app to ensure clean state
-    try {
-      await k8sCoreApi.deleteCollectionNamespacedPod({
-        namespace,
-        labelSelector: `app=${name}`
-      })
-      console.log(`[API] Deleted pods for ${name} in ${namespace}`)
-    } catch (e: any) {
-      console.warn(`[API] Failed to delete pods (non-fatal):`, e.body?.message || e.message)
-    }
 
     // 3. Set rebuild token to trigger a fresh build (no cache)
     await k8sMergePatch({

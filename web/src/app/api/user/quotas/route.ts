@@ -2,7 +2,7 @@ import { auth } from "@/auth"
 import { getUserQuotas } from "@/lib/api"
 import { NextResponse, NextRequest } from "next/server"
 import { resolveUserSession } from "@/lib/auth-utils"
-import { k8sCustomApi } from "@/lib/k8s"
+import { k8sClusterMergePatch } from "@/lib/k8s"
 
 export async function GET() {
   const session = await auth()
@@ -33,16 +33,13 @@ export async function PATCH(req: NextRequest) {
             }
         }
 
-        await k8sCustomApi.patchClusterCustomObject({
+        await k8sClusterMergePatch({
             group: "gitship.io",
             version: "v1alpha1",
             plural: "gitshipusers",
             name: internalId,
             body: patch
-                    }, {
-                        // @ts-expect-error - headers is missing in ConfigurationOptions but supported at runtime
-                        headers: { "Content-Type": "application/merge-patch+json" }
-                    })
+        })
         return NextResponse.json({ ok: true })
     } catch (e: any) {
         console.error("[API] Failed to update user quotas:", e.body?.message || e.message)
