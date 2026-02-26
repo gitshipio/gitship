@@ -10,15 +10,12 @@ env:
 
 jobs:
   build-and-push:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     permissions:
       contents: write
       packages: write
 
     steps:
-      - name: Fix workspace permissions
-        run: sudo chown -R $(whoami) ${{ github.workspace }} || true
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -95,7 +92,3 @@ jobs:
         with:
           files: dist/install.yaml
           generate_release_notes: true
-
-      - name: Fix workspace permissions
-        if: always()
-        run: sudo chown -R $(whoami) ${{ github.workspace }}
