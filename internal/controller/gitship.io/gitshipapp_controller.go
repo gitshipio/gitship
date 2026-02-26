@@ -148,7 +148,24 @@ func (r *GitshipAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	jobName := fmt.Sprintf("%s-build-%s", gitshipApp.Name, latestCommit[:7])
 	if isRebuild {
-		jobName = fmt.Sprintf("%s-rebuild-%s", gitshipApp.Name, time.Now().Format("02150405")) // unique name for rebuild
+		token := gitshipApp.Spec.RebuildToken
+		if len(token) > 8 {
+			token = token[:8]
+		}
+		jobName = fmt.Sprintf("%s-rebuild-%s", gitshipApp.Name, token)
+	}
+
+	// Safety: Check if any active build job already exists for this app
+	existingJobs := &batchv1.JobList{}
+	if err := r.List(ctx, existingJobs,
+		client.InNamespace(gitshipApp.Namespace),
+		client.MatchingLabels{"gitship.io/app": gitshipApp.Name}); err == nil {
+		for _, ej := range existingJobs.Items {
+			if ej.Status.Succeeded == 0 && ej.Status.Failed == 0 {
+				log.Info("Build job already running, waiting", "job", ej.Name)
+				return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+			}
+		}
 	}
 
 	job := &batchv1.Job{}
@@ -167,6 +184,10 @@ func (r *GitshipAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			gitshipApp.Status.LatestRebuildToken = gitshipApp.Spec.RebuildToken
 		}
 		r.recordBuild(gitshipApp, latestCommit, "Succeeded", "Build completed successfully")
+		gitshipApp.Status.LatestBuildID = latestCommit
+		if err := r.Status().Update(ctx, gitshipApp); err != nil {
+			return ctrl.Result{}, err
+		}
 		return ctrl.Result{Requeue: true}, nil
 	} else if job.Status.Failed > 0 {
 		log.Info("Build Job failed, recording")
