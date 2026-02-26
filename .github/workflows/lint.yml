@@ -7,11 +7,8 @@ on:
 jobs:
   lint:
     name: Run on Ubuntu
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
-      - name: Fix workspace permissions
-        run: sudo chown -R $(whoami) ${{ github.workspace }} || true
-
       - name: Clone the code
         uses: actions/checkout@v4
 
@@ -24,7 +21,3 @@ jobs:
         uses: golangci/golangci-lint-action@v8
         with:
           version: v2.1.0
-
-      - name: Fix workspace permissions
-        if: always()
-        run: sudo chown -R $(whoami) ${{ github.workspace }}
